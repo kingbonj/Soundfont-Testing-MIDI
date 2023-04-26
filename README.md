@@ -29,10 +29,13 @@ By default, the program will look for MIDI files in the `~/MIDI/` directory. You
 The program will display the metadata for the first MIDI file in the shuffled list and start playing it using the default SoundFont.
 Use the following keys to control the program:
 
-s: Switch to the next SoundFont.
-,: Switch to the previous track.
-.: Switch to the next track.
-q: Quit the program.
+`s` : Switch to the next SoundFont.
+
+`,` : Switch to the previous track.
+
+`.` : Switch to the next track.
+
+`q` : Quit the program.
 
 ## License
 

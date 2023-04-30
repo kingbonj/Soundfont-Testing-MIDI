@@ -60,11 +60,6 @@ display_metadata() {
   
 }
 
-
-
-
-
-
 # Function to handle user input
 handle_input() {
   while true; do
@@ -73,7 +68,7 @@ handle_input() {
       ".") echo "next";;
       ",") echo "prev";;
       "s") echo "sf2";;
-#      "o") echo "save";;
+      "o") echo "save";;
       "q") echo "quit";;
       *) continue;;
     esac
@@ -83,16 +78,21 @@ handle_input() {
 
 # Function to display a menu
 display_menu() {
-  echo "(s)witch soundfont (,)previous (.)next (q)uit"
+  echo "(s)witch soundfont (,)previous (.)next (o)utput (q)uit"
 }
 
 # Function to save the current track as an mp3
 save_track() {
+  case "$current_track" in
+    *.mid) current_track_basename=$(basename "$current_track" .mid);;
+    *.MID) current_track_basename=$(basename "$current_track" .MID);;
+    *) echo "Error: Invalid file extension for MIDI file.";;
+  esac
   current_track_basename=$(basename "$current_track" .mid)
   sf2_basename=$(basename "$current_sf2")
   sf2_basename="${sf2_basename%.*}"
   output_dir="$(dirname "$0")/Output"
-  output_file="$output_dir/$current_track_basename $sf2_basename.mp3"
+  output_file="$output_dir/$current_track_basename-$sf2_basename.mp3"
 
   # Kill fluidsynth to ensure that the correct soundfont is used for conversion
   killall fluidsynth >/dev/null 2>&1
@@ -103,9 +103,15 @@ save_track() {
   fi
 
   echo "Saving track as $output_file..."
-  sf2_current=$(basename "$current_sf2")
-  timidity "$current_track" -Ow -o - | lame - "$output_file"
+  sf2_current=$(basename "$current_sf2" .sf2)
+  fluidsynth -F "$output_dir/$current_track_basename-$sf2_current.wav" "$current_sf2" "$current_track" | lame - "$output_file"
+  find "$output_dir" -type f -name '*.wav' | while read file; do
+    output_file="${file%.*}.mp3"
+    lame "$file" "$output_file"
+done
   echo "Track saved to $output_dir."
+  echo "Cleaning up temporary files..."
+  rm "$output_dir"/*.wav
 }
 
 # Function to clean up when the script exits
@@ -162,9 +168,9 @@ while true; do
     elif [[ "$input" == "quit" ]]; then
       cleanup
       exit 0
-    #elif [[ "$input" == "save" ]]; then
-    #  save_track
-    #  break
+    elif [[ "$input" == "save" ]]; then
+      save_track
+      break
     elif [[ "$input" == "sf2" ]]; then
       kill $fluidsynth_pid
       current_sf2_index=$((current_sf2_index + 1))

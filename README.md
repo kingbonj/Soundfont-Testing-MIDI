@@ -9,7 +9,7 @@ Before using this program, you'll need to have the following installed:
 ```
 fluidsynth
 timidity
-lame (for conversion and output not yet implemented)
+lame (for conversion to .mp3)
 find (usually included in most Linux distributions)
 shuf (usually included in most Linux distributions)
 ```

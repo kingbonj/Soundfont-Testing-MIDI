@@ -35,6 +35,8 @@ Use the following keys to control the program:
 
 `.` : Switch to the next track.
 
+`o` : Output current track to MP3 using current soundfont. 
+
 `q` : Quit the program.
 
 ## License

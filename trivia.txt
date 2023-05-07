@@ -3,15 +3,12 @@ The Sound Blaster 16, a popular sound card for MS-DOS computers, was released in
 The Roland MT-32, an external MIDI module released in 1987, was a popular choice for MS-DOS game music due to its high-quality instrument samples.
 The AdLib Music Synthesizer Card, a popular sound card for MS-DOS computers, was released in 1987 and used FM synthesis to create realistic instrument sounds.
 LucasArts' classic adventure game "The Secret of Monkey Island" was released for MS-DOS in 1990 and featured an original score composed by Michael Land using the iMUSE interactive music system.
-The Roland SC-55, a popular MIDI sound module released in 1991, was used in many MS-DOS games and was known for its high-quality instrument sounds.
-The PC speaker, a basic sound device built into many MS-DOS computers, was used for sound effects in many early PC games.
 The Gravis Ultrasound, a sound card released in 1992, was known for its high-quality wavetable synthesis and support for up to 32 simultaneous channels of digital audio playback.
 The MIDI Maze, a multiplayer game for the Atari ST released in 1987, was one of the first games to use MIDI for sound effects and music.
 The first version of MS-DOS, called QDOS (Quick and Dirty Operating System), was created in just six weeks by Tim Paterson in 1980.
 The Sound Blaster Pro, a popular sound card for MS-DOS computers, was released in 1991 and was capable of playing back MIDI music in addition to digital audio.
 The Roland MT-32, released in 1987, was a popular MIDI synthesizer used for many early DOS games, including Sierra On-Line titles such as King's Quest and Space Quest.
 The LucasArts game "X-Wing" (1993) was one of the first games to use CD-quality recorded music instead of MIDI, thanks to the game's use of Red Book audio.
-The "Doom" series of games (1993-1996) used a combination of MIDI music and digitally recorded sound effects to create a unique and immersive audio experience.
 The "Ultima" series of RPGs, which began in 1981, used a variety of MIDI synthesizers and sound cards over the years, including the Roland MT-32, AdLib, and Sound Blaster.
 The first version of MS-DOS, called QDOS (Quick and Dirty Operating System), was created in just six weeks by Tim Paterson in 1980.
 The Sound Blaster Pro, a popular sound card for MS-DOS computers, was released in 1991 and was capable of playing back MIDI music in addition to digital audio.
@@ -32,19 +29,8 @@ The game "Dune II" (1992) was one of the first real-time strategy games to use M
 The game "Mega Man X" (1993) featured a dynamic MIDI soundtrack that would change depending on the player's actions and the level they were on.
 The game "Descent" (1994) used MIDI music that would react to the gameplay, speeding up or slowing down depending on the action on screen.
 The game "Wing Commander III" (1994) featured a full orchestral score, which was recorded with the Seattle Symphony Orchestra.
-The game "Master of Orion II" (1996) used a dynamic MIDI soundtrack that would change based on the player's progress and other factors.
-The game "Star Wars: Dark Forces" (1995) used a custom MIDI score that incorporated themes from the "Star Wars" movies.
 The game "Jazz Jackrabbit" (1994) featured a soundtrack composed by Robert Allen, who also worked on the music for the "Commander Keen" series.
-The game "Command & Conquer" (1995) used a cinematic MIDI score that helped to create a dramatic and immersive atmosphere.
-The game "Civilization" (1991) used a unique MIDI score that would change depending on the player's civilization and other factors.
-The game "Ultima VII: The Black Gate" (1992) featured a dynamic MIDI score that would change based on the player's actions and the game's events.
-The game "Warcraft: Orcs & Humans" (1994) used MIDI music that helped to create a tense and exciting atmosphere.
-The game "Mystic Towers" (1994) used a dynamic MIDI soundtrack that would change based on the player's progress and actions.
-The game "The Elder Scrolls: Arena" (1994) used a MIDI score that was created using a custom algorithm, which allowed for dynamic and complex music.
-The game "Lemmings" (1991) used a distinctive MIDI score that helped to create a whimsical and lighthearted atmosphere.
 The game "Raptor: Call of the Shadows" (1994) used MIDI music that was composed by Dan Froelich, who also worked on the music for the "Duke Nukem" series.
-The game "Doom" (1993) used a custom MIDI score that incorporated heavy metal and industrial influences.
-The game "Star Control II" (1992) used a dynamic MIDI soundtrack that would change based on the player's actions and the game's events.
 The game "One Must Fall 2097" (1994) used a MIDI score that was composed by Kenny Chou, who also worked on the music for the "Descent" series.
 The game "Lands of Lore: The Throne of Chaos" (1993) featured a dynamic MIDI score that would change based on the player's location and the game's events.
 The game "Indiana Jones and the Fate of Atlantis" (1992) used a MIDI score that was composed by Clint Bajak
@@ -104,14 +90,13 @@ The soundtrack was included with the full version of the game, but the shareware
 The music in Tyrian was composed to match the tone and atmosphere of the game, which features intense space battles and a dystopian future.
 The music in Tyrian has influenced many game music composers and has become a beloved part of gaming history.
 The music for System Shock was composed by Greg LoPiccolo, who was also responsible for the sound design of the game.
-The soundtrack features a mix of electronic and orchestral music, with some tracks featuring a full orchestra while others use entirely synthesized sounds.
-The music was composed using the Impulse Tracker software, which was a popular tool for creating electronic music in the 1990s.
-The System Shock soundtrack is notable for its use of ambient music, which creates a tense and eerie atmosphere throughout the game.
-The soundtrack includes several vocal tracks, including a rendition of "Amazing Grace" and a cover of the Rolling Stones song "Paint It Black".
+The soundtrack for System Shock features a mix of electronic and orchestral music, with some tracks featuring a full orchestra while others use entirely synthesized sounds.
+The System Shock music was composed using the Impulse Tracker software, which was a popular tool for creating electronic music in the 1990s. The System Shock soundtrack is notable for its use of ambient music, which creates a tense and eerie atmosphere throughout the game.
+The System Shock soundtrack includes several vocal tracks, including a rendition of "Amazing Grace" and a cover of the Rolling Stones song "Paint It Black".
 Many of the tracks in the System Shock soundtrack have been remixed and reinterpreted by fans, and are still popular today.
-The music was originally released on a limited edition CD, which is now a sought-after collector's item.
+The System Shock music was originally released on a limited edition CD, which is now a sought-after collector's item.
 The System Shock soundtrack was praised by critics at the time of its release, and is still considered a classic of video game music.
-The music was so successful that it led to LoPiccolo being hired by Harmonix, where he worked on the music for the popular game Rock Band.
+The System Shock music was so successful that it led to LoPiccolo being hired by Harmonix, where he worked on the music for the popular game Rock Band.
 The System Shock soundtrack has been cited as an influence by many contemporary electronic musicians, and has been featured in several films and television shows over the years.
 The original Doom game featured a soundtrack composed by Bobby Prince, consisting of heavy metal and industrial rock tracks.
 The soundtrack for Doom II: Hell on Earth was also composed by Bobby Prince and included a wider range of musical styles, including jazz and ambient music.
@@ -163,20 +148,13 @@ The MT-32 used a type of synthesis called Linear Arithmetic (LA) synthesis.
 The MT-32 had 128 preset patches, but users could also create their own custom patches using a software editor.
 The MT-32 was not a General MIDI device, which meant that its sounds were not standardized across different instruments.
 The AdLib sound card, released in 1987, was one of the first affordable FM synthesis sound cards for DOS computers.
-The AdLib card was popularized by id Software's Commander Keen series of games.
-The AdLib card could generate 9 voices, which could be combined into 6 different channels.
-The AdLib card had 9 preset instrument patches and 9 percussion patches.
-The AdLib card was eventually replaced by the Sound Blaster, which offered better sound quality and more features.
-The Sound Blaster was released in 1989 and quickly became the standard for PC gaming sound.
-The Sound Blaster supported both FM synthesis and digital sampling.
+The AdLib card was popularized by id Software's Commander Keen series of games. It could generate 9 voices, which could be combined into 6 different channels.It also had 9 preset instrument patches and 9 percussion patches, but was eventually replaced by the Sound Blaster, which offered better sound quality and more features.
+The Sound Blaster was released in 1989 and quickly became the standard for PC gaming sound. It supported both FM synthesis and digital sampling.
 The Sound Blaster's digital sampling capabilities allowed for better quality sound effects and voice samples.
 The Sound Blaster Pro, released in 1991, added stereo sound and 16-bit sampling.
 The Sound Blaster 16, released in 1992, added CD-quality audio playback and support for General MIDI.
-The Gravis Ultrasound, released in 1992, was a competing sound card that offered better sound quality than the Sound Blaster.
-The Gravis Ultrasound used wavetable synthesis, which allowed for more realistic instrument sounds.
-The Gravis Ultrasound had 32 hardware channels, which could be combined into 24 different virtual channels.
-The Gravis Ultrasound supported both General MIDI and Sound Blaster-compatible sound.
-The Gravis Ultrasound was eventually replaced by newer sound cards that offered better compatibility with modern operating systems.
+The Gravis Ultrasound, released in 1992, was a competing sound card that offered better sound quality than the Sound Blaster. It used wavetable synthesis, which allowed for more realistic instrument sounds.
+The Gravis Ultrasound had 32 hardware channels, which could be combined into 24 different virtual channels. It supported both General MIDI and Sound Blaster-compatible sound but was eventually replaced by newer sound cards that offered better compatibility with modern operating systems.
 Many MIDI soundcards for DOS games, such as the Roland MT-32 and the Roland Sound Canvas, were actually designed for MIDI music production, not gaming.
 The Yamaha MU50 and the Roland SC-88Pro were some of the most advanced MIDI soundcards available for DOS games, with 64-voice polyphony and advanced sound editing capabilities.
 The Ensoniq Soundscape S-2000 was a MIDI soundcard for DOS games that was also capable of recording and playing back digital audio.
@@ -220,3 +198,58 @@ The DOS game "SimCity" featured a dynamic soundtrack that would change depending
 The DOS game "Stunts" featured a lively and energetic soundtrack that perfectly matched the game's fast-paced racing gameplay.
 The DOS game "Day of the Tentacle" featured a whimsical and playful soundtrack that perfectly matched the game's quirky and offbeat sense of humor.
 The DOS game "Police Quest III: The Kindred" featured a soundtrack that was composed by Jan Hammer, who also composed the iconic music for the TV series "Miami Vice".
+The Gravis Ultrasound (GUS) sound card had a unique wavetable synthesizer chip called the GF1, which was capable of producing high-quality digital audio with 32-voice polyphony and 16-bit resolution. Compared to other sound cards of the time, the GF1 was more advanced, featuring a custom-designed waveform generator and envelope generator, which allowed for complex sound shaping and modulation. In addition, the GUS had a dedicated memory buffer for MIDI data, which ensured smooth playback and minimal latency. This made it a popular choice among DOS gamers and music enthusiasts, as it could produce sound quality that was superior to most other sound cards of the era.
+One of the main differences between the GUS and Sound Blaster cards was the way they handled MIDI music. The GUS used its own custom wavetable synthesis engine, which allowed for more realistic instrument sounds and a greater range of musical expression. In contrast, the Sound Blaster used FM synthesis, which was less advanced and tended to produce more simplistic, tinny-sounding music.
+In terms of hardware, the GUS was also more advanced than the Sound Blaster. It featured a custom DSP chip and up to 32 channels of sound, compared to the Sound Blaster's 8 channels. The GUS also had more memory, which allowed for longer, more complex MIDI tracks to be played without stuttering or dropping notes.
+The original Duke Nukem game, released in 1991, had a MIDI soundtrack composed by Lee Jackson.
+Jackson also composed the MIDI soundtrack for Duke Nukem II, released in 1993.
+The Duke Nukem 3D game, released in 1996, had a completely different soundtrack, this time featuring licensed music and original songs composed by Bobby Prince.
+However, Jackson did compose an original song for Duke Nukem 3D: "Grabbag," which became the game's main theme and is still associated with the Duke Nukem franchise to this day.
+The Duke Nukem MIDI soundtrack was designed to work with the AdLib sound card, which was a popular choice for PC gamers in the early 1990s. The AdLib sound card used FM synthesis to generate audio, which was a common method for creating game music at the time.
+Despite being composed using MIDI, the Duke Nukem soundtrack was known for its high quality and catchy tunes, which helped to establish the Duke Nukem franchise as a fan favorite. Some of the most popular tracks from the Duke Nukem MIDI soundtrack include "Grabbag," "Stalker," and "Woo Hoo!".
+Lee Jackson composed the original sountrack to Duke Nukem in 1991, and continued to compose music for the Duke Nukem franchise, contributing to the soundtracks of Duke Nukem: Manhattan Project and Duke Nukem Forever. In addition to his work on Duke Nukem, Jackson has also composed music for other classic PC games such as Rise of the Triad and Shadow Warrior.
+The music in Duke Nukem 3D was composed by Lee Jackson, who also composed the music for the first two Duke Nukem games.
+The Duke Nukem 3D soundtrack features a variety of genres, including rock, jazz, and techno.
+Lee Jackson's band, The Roquefort Files, performs the song "Grabbag" which serves as the Duke Nukem 3D main theme and is one of the most iconic video game songs of all time.
+The Duke Nukem 3D soundtrack was released on CD-ROM, allowing players to listen to the music outside of the game.
+In Duke Nukem 3D, the game's final boss, the Alien Queen, has her own unique theme music called "Stalker".
+In Duke Nukem 3D, the song "Taking the Death Toll" plays during the game's final level, and features a sample from the movie Aliens. Also, one of the game's levels, "Raw Meat", features music from the film Predator.
+The song "Taking Names" from Duke Nukem 3D features a sample of Duke saying "It's time to kick ass and chew bubblegum...and I'm all outta gum".
+Lee Jackson, composer of the Duke Nukem 3D soundtrack, has said that the soundtrack was heavily influenced by the work of composer John Williams, known for his scores for films such as Star Wars and Indiana Jones.
+The Duke Nukem 3D soundtrack has been praised for its ability to capture the game's irreverent and over-the-top tone, as well as its use of memorable melodies and catchy hooks.
+The last major development before streaming music came in 1992: Roland Corporation released the first General MIDI card, the sample-based SCC-1, an add-in card version of the SC-55 desktop MIDI module.
+MIDI stands for Musical Instrument Digital Interface. It was first introduced in 1983 as a standard protocol for communication between electronic musical instruments and computers.
+MIDI is not an audio format, but a data protocol that sends information about note pitch, duration, velocity, and other performance data between devices. The MIDI protocol can be transmitted over various interfaces, including USB, Bluetooth, and Wi-Fi.
+MIDI data can be recorded, edited, and played back using a wide range of software applications and hardware devices. It can also be used to control various aspects of a musical performance, including sound generation, effects processing, and lighting.
+The MIDI specification has been updated several times since its initial release, with the most recent version being MIDI 2.0.
+MIDI is an open standard, meaning that anyone can develop and implement MIDI-enabled hardware or software without paying licensing fees.
+The soundtrack for the game "Terra Nova: Strike Force Centauri" was composed by a team that included the lead singer of the heavy metal band Testament.
+The composer of the "Heretic" and "Hexen" soundtracks, Kevin Schilder, was also a professional painter and sculptor.
+The soundtrack for the game "Might and Magic VI: The Mandate of Heaven" was composed by Paul Romero, who also wrote the music for the "Heroes of Might and Magic" series.
+The MIDI soundtrack for "Wing Commander III: Heart of the Tiger" was composed by George Oldziey, who also worked on the "Wing Commander IV" and "Wing Commander Prophecy" soundtracks.
+The "Jazz Jackrabbit" soundtrack was composed by Alexander Brandon, who later went on to work on the music for "Unreal" and "Deus Ex".
+The "Descent" soundtrack was composed by Type O Negative keyboardist Josh Silver.
+The soundtrack for the game "Ecco the Dolphin: Defender of the Future" was composed by Tim Follin, who is known for his work on many classic NES and SNES games.
+The "Commander Keen" series of games featured MIDI soundtracks composed by Bobby Prince, who also wrote the music for the original "Doom" and "Wolfenstein 3D".
+The "Tyrian" soundtrack was composed by Alexander Brandon, who also worked on the music for "Jazz Jackrabbit" and "Unreal".
+The "Star Control II" soundtrack was composed by a team that included Dan Nicholson, who went on to work on the music for "Diablo III".
+The soundtrack for the 1992 game "Ultima VII" was composed by George "The Fat Man" Sanger, who also composed the soundtrack for the game "Wing Commander".
+The soundtrack for the 1994 game "Little Big Adventure" was composed by Philippe Vachey, who also composed the soundtrack for the "Alone in the Dark" series.
+The soundtrack for the 1992 game "Eye of the Beholder III" was composed by Yuzo Koshiro, who also composed the soundtracks for the "Streets of Rage" and "Etrian Odyssey" series.
+The soundtrack for the 1994 game "System Shock" was composed by Greg LoPiccolo, who also worked on the soundtracks for "Thief: The Dark Project" and "Deus Ex".
+The soundtrack for the 1996 game "Quake" was composed by Trent Reznor, the lead singer of the band Nine Inch Nails.
+The soundtrack for the 1993 game "Alone in the Dark 2" was composed by Jean-Jacques Perrey, who was also known for his work in the electronic music genre.
+The soundtrack for the 1991 game "Might and Magic III: Isles of Terra" was composed by Rob King and Paul Romero, who also composed the soundtracks for the "Heroes of Might and Magic" series.
+The soundtrack for the 1995 game "Descent" was composed by Type O Negative, a gothic metal band from Brooklyn.
+The soundtrack for the 1993 game "Betrayal at Krondor" was composed by Jan Paul Moorhead, who also worked on the soundtracks for the "Space Quest" series.
+The soundtrack for the 1994 game "Jazz Jackrabbit" was composed by Robert A. Allen, who also composed the soundtrack for the game "Commander Keen".
+In the Super Nintendo game "Chrono Trigger," composer Yasunori Mitsuda utilized a technique called "layering" to create rich, textured soundscapes using multiple instruments playing simultaneously.
+The Sega Genesis game "Sonic the Hedgehog 2" features music composed by Masato Nakamura, who used a technique called "FM synthesis" to create the game's distinctive electronic sound.
+In "Final Fantasy VII," composer Nobuo Uematsu utilized "leitmotif" to create recurring musical themes associated with different characters and events in the game.
+The game "Mega Man 2" features music composed by Takashi Tateishi, who used a technique called "arpeggiation" to create fast-paced, energetic melodies using notes played in rapid succession.
+"Donkey Kong Country" for the Super Nintendo features music composed by David Wise, who used a technique called "sample-based synthesis" to create realistic instrument sounds using digital audio samples.
+In "Castlevania: Symphony of the Night," composer Michiru Yamane used a technique called "chromaticism" to create music with intricate, complex harmonies that incorporated notes outside of traditional Western scales.
+The music in the Sega Saturn game "NiGHTS into Dreams" was composed by Tomoko Sasaki, who utilized a technique called "overdubbing" to layer multiple musical parts on top of one another.
+In "The Legend of Zelda: Ocarina of Time," composer Koji Kondo used a technique called "programmatic music" to create music that reflects the game's story and setting, such as using a simple, pastoral melody for the game's opening in Kokiri Forest.
+The game "Earthbound" for the Super Nintendo features music composed by Keiichi Suzuki and Hirokazu Tanaka, who used a technique called "sampling" to incorporate sound effects and music from other sources into the game's soundtrack.
+In "Sonic Adventure," composer Jun Senoue used a technique called "palm muting" to create guitar parts with a muffled, percussive sound by partially muting the strings with the palm of the hand.

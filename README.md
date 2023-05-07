@@ -1,7 +1,7 @@
 # MIDI Soundfont Testing Program
 This is a Bash script that allows you to test a shuffled list of MIDI files with different SoundFonts. The program uses the fluidsynth command to play the MIDI files using the selected SoundFont and provides basic controls for switching between tracks and SoundFonts.
 
-![screenshot](https://user-images.githubusercontent.com/38471159/234487823-ca5a4607-19d1-4a57-8936-eab800aab94b.png)
+![Screenshot 2023-05-07 15 38 05](https://user-images.githubusercontent.com/38471159/236684191-559a5edd-7256-4b6d-9449-bfbfdee5a49f.png)
 
 ## Prerequisites
 Before using this program, you'll need to have the following installed:
@@ -12,6 +12,7 @@ timidity
 lame (for conversion to .mp3)
 find (usually included in most Linux distributions)
 shuf (usually included in most Linux distributions)
+trivia.txt (optional - place in the working directory of the script)
 ```
 
 

@@ -19,6 +19,8 @@ trivia.txt (optional - place in the working directory of the script)
 
 
 ## Usage
+![Screenshot 2023-05-07 22 33 07](https://user-images.githubusercontent.com/38471159/236703573-3f424a06-1703-40fe-ac5e-98d45266d16e.png)
+
 1. Clone the repository or download the `midi_soundfont_test.sh` script.
 2. Open a terminal and navigate to the directory where the script is located.
 3. Run the script with the following command:

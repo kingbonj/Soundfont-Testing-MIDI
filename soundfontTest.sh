@@ -246,6 +246,7 @@ play() {
       echo " "
     fi
     display_menu
+      echo " "
 
     # Start fluidsynth
     fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &

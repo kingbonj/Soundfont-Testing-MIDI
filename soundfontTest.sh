@@ -1,6 +1,37 @@
 #!/bin/bash
-espeak "welcome"
+
 midi_dir=${1:-~/MIDI/}
+
+# Function to display usage
+usage() {
+  echo " "
+  echo "    MIDI Soundfont Testing Program (c)2023"
+  echo " "
+  echo "    Usage: $0 [options]"
+  echo " "
+  echo "    Options:"
+  echo "          -h        Display this help message"
+  echo "          -d DIR    Specify the MIDI directory to use (default: ~/MIDI/)"
+  echo " "
+  exit 0
+}
+
+# Check for -h parameter
+while getopts "hd:" opt; do
+  case ${opt} in
+    h )
+      usage
+      ;;
+    d )
+      midi_dir="$OPTARG"
+      ;;
+    \? )
+      echo "Invalid option: -$OPTARG" 1>&2
+      usage
+      ;;
+  esac
+done
+shift $((OPTIND -1))
 
 # Kill fluidsynth
 killall fluidsynth >/dev/null 2>&1
@@ -17,7 +48,6 @@ find_sf2_files() {
   find /usr/share/sounds/sf2/ -type f -iname "*.sf2"
 }
 
-display_metadata() {
   # Set color codes for output
   red='\033[0;31m'
   bright_red='\033[0;91m'
@@ -29,13 +59,13 @@ display_metadata() {
   blue='\033[0;34m'
   purple='\033[0;35m'
   white='\033[0;37m'
-  grey='\033[0;90m'    # Grey color code
-  orange='\033[0;33m'  # Orange color code
+  grey='\033[0;90m'
+  orange='\033[0;33m'
   light_yellow='\e[93m'
+  highlight='\u001b[46m'
   nocolor='\033[0m'
-  
-  # Reset color code
-  nocolor='\033[0m'
+
+display_metadata() {
   
   # Set maximum width for each column
   col_width=30
@@ -154,7 +184,6 @@ cleanup() {
   echo "Done."
 }
 
-
 # Set up trap to call cleanup function when the script exits
 trap cleanup EXIT
 
@@ -172,16 +201,42 @@ play() {
     current_track="${shuffled_midi_files[$current_track_index]}"
     next_track="${shuffled_midi_files[$((current_track_index + 1))]}"
     current_sf2="${sf2_files[$current_sf2_index]}"
+    sf2_basename=$(basename "$current_sf2")
+
 
     clear
 
     echo ""
     echo "╔╦╗╦╔╦╗╦  ╔═╗┌─┐┬ ┬┌┐┌┌┬┐┌─┐┌─┐┌┐┌┌┬┐       ╔╦╗┌─┐┌─┐┌┬┐"
-    echo "║║║║ ║║║  ╚═╗│ ││ ││││ ││├┤ │ ││││ │   ───   ║ ├┤ └─┐ │   v1.3.0"
+    echo "║║║║ ║║║  ╚═╗│ ││ ││││ ││├┤ │ ││││ │   ───   ║ ├┤ └─┐ │   v1.3.1"
     echo "╩ ╩╩═╩╝╩  ╚═╝└─┘└─┘┘└┘─┴┘└  └─┘┘└┘ ┴         ╩ └─┘└─┘ ┴ "
-    echo ""
-    echo ""
+    echo " "
+    echo " "
     display_metadata "$current_track" "$current_sf2" "$next_track"
+    echo " "
+    
+    sf2_files_list=($(find /usr/share/sounds/sf2/ -type f -iname "*.sf2" -printf "%f\n"))
+  
+    # Display available sf2
+    echo -e "${blue}Available Soundfonts:\n---------------------${nocolor}"
+    sf2_columns=6  # number of columns to display
+    sf2_width=$(( (90 - sf2_columns + 1) / sf2_columns ))  # width of each column, including the tab character
+    for (( i=0; i<${#sf2_files_list[@]}; i++ )); do
+      sf2="${sf2_files_list[$i]}"
+      if [[ "$sf2" == "$sf2_basename" ]]; then
+        # Highlight the current .sf2 file in the list using ANSI color codes
+        printf "${nocolor}${highlight}"
+      else
+        printf "${grey}"
+      fi
+      printf "%-${sf2_width}s" "$sf2"
+      if [[ "$(( (i+1) % sf2_columns ))" -eq 0 || "$i" -eq "$((${#sf2_files_list[@]}-1))" ]]; then
+        printf "${nocolor}\n"
+      else
+        printf "\t"
+      fi
+    done
+
     
     echo " "
     if [ -f "trivia.txt" ]; then
@@ -191,21 +246,11 @@ play() {
       echo " "
     fi
     display_menu
-    echo " "
 
     # Start fluidsynth
     fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &
     fluidsynth_pid=$!
-    
-    # Create a temporary directory for split MIDI files.
-    if [ ! -d "tmp" ]; then
-      mkdir tmp
-    fi
-    temp_dir=$(mktemp -d -p "$(pwd)/tmp")
-    
-    # Convert the input file to csv.
-    midicsv "$current_track" > "$temp_dir/data.csv"
-    
+  
     input=$(handle_input 5)  # Wait for up to 5 seconds for user input
     if [[ "$input" == "next" ]]; then
       kill $fluidsynth_pid

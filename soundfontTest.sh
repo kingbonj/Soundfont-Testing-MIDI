@@ -129,7 +129,7 @@ display_menu() {
   echo " "
   echo "Controls"
   echo "--------"
-  echo "(s)witch soundfont (,)previous (.)next (o)utput MP3 (q)uit"
+  printf "(s)witch soundfont\t(,)previous\t(.)next\t\t(o)utput MP3\t(q)uit"
 }
 
 # Function to save the current track as an mp3
@@ -203,7 +203,6 @@ play() {
     current_sf2="${sf2_files[$current_sf2_index]}"
     sf2_basename=$(basename "$current_sf2")
 
-
     clear
 
     echo ""
@@ -240,9 +239,9 @@ play() {
     
     echo " "
     if [ -f "trivia.txt" ]; then
-      echo -e "${bright_red}Trivia"
+      echo -e "${red}Trivia"
       echo -e "------"
-      echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
+      echo -e "${grey}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
       echo " "
     fi
     display_menu
@@ -274,6 +273,8 @@ play() {
     fi
 
   done
+        echo " "
+
 }
 
 play

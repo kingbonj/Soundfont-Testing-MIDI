@@ -1,5 +1,5 @@
 #!/bin/bash
-
+espeak "welcome"
 midi_dir=${1:-~/MIDI/}
 
 # Kill fluidsynth
@@ -96,6 +96,9 @@ handle_input() {
 
 # Function to display a menu
 display_menu() {
+  echo " "
+  echo "Controls"
+  echo "--------"
   echo "(s)witch soundfont (,)previous (.)next (o)utput MP3 (q)uit"
 }
 
@@ -172,7 +175,11 @@ play() {
 
     clear
 
-    echo -e "MIDI Soundfont Testing Program v1.3"
+    echo ""
+    echo "╔╦╗╦╔╦╗╦  ╔═╗┌─┐┬ ┬┌┐┌┌┬┐┌─┐┌─┐┌┐┌┌┬┐       ╔╦╗┌─┐┌─┐┌┬┐"
+    echo "║║║║ ║║║  ╚═╗│ ││ ││││ ││├┤ │ ││││ │   ───   ║ ├┤ └─┐ │   v1.3.0"
+    echo "╩ ╩╩═╩╝╩  ╚═╝└─┘└─┘┘└┘─┴┘└  └─┘┘└┘ ┴         ╩ └─┘└─┘ ┴ "
+    echo ""
     echo ""
     display_metadata "$current_track" "$current_sf2" "$next_track"
     
@@ -180,7 +187,7 @@ play() {
     if [ -f "trivia.txt" ]; then
       echo -e "${bright_red}Trivia"
       echo -e "------"
-      echo -e "${red}Did you know that $(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//')?\033[0m" | fold -s -w 90
+      echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
       echo " "
     fi
     display_menu

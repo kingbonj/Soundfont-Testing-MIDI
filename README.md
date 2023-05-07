@@ -40,7 +40,7 @@ Use the following keys to control the program:
 
 `.` : Switch to the next track.
 
-`o` : Output current track to MP3 using current soundfont (saved to `/Output/*.mp3). 
+`o` : Output current track to MP3 using current soundfont (saved to `/Output/*.mp3`). 
 
 `q` : Quit the program.
 

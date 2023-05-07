@@ -2,6 +2,12 @@
 
 midi_dir=${1:-~/MIDI/}
 
+# Kill fluidsynth
+killall fluidsynth >/dev/null 2>&1
+if pidof pulseaudio; then
+  pulseaudio -k
+fi
+
 find_midi_files() {
     find "$midi_dir" -type f -iname '*.mid' -o -iname '*.midi'
 }
@@ -60,21 +66,32 @@ display_metadata() {
   
 }
 
-# Function to handle user input
 handle_input() {
-  while true; do
-    read -rsn1 input
-    case "$input" in
-      ".") echo "next";;
-      ",") echo "prev";;
-      "s") echo "sf2";;
-      "o") echo "save";;
-      "q") echo "quit";;
-      *) continue;;
-    esac
-    break
-  done
+    while [ -n "$(pgrep fluidsynth)" ]; do
+        read -rsn1 -t 1 input
+        if [[ "$input" == "." ]]; then
+            echo "next"
+            return 0
+        elif [[ "$input" == "," ]]; then
+            echo "prev"
+            return 0
+        elif [[ "$input" == "s" ]]; then
+            echo "sf2"
+            return 0
+        elif [[ "$input" == "o" ]]; then
+            echo "save"
+            return 0
+        elif [[ "$input" == "q" ]]; then
+            echo "quit"
+            return 0
+        fi
+    done
+
+    # If fluidsynth is not running, return an empty string
+    echo ""
+    return 0
 }
+
 
 # Function to display a menu
 display_menu() {
@@ -138,44 +155,48 @@ sf2_files=($(find_sf2_files))
 current_track_index=0
 current_sf2_index=0
 
-while true; do
-  current_track="${shuffled_midi_files[$current_track_index]}"
-  next_track="${shuffled_midi_files[$((current_track_index + 1))]}"
-  current_sf2="${sf2_files[$current_sf2_index]}"
-  
-  clear
-  
-  echo -e "MIDI Soundfont Testing Program v1.0"
-  echo ""
-  display_metadata "$current_track" "$current_sf2" "$next_track"
-  display_menu
-
-  fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &
-
-  fluidsynth_pid=$!
-
+play() {
   while true; do
-    input=$(handle_input)
+    current_track="${shuffled_midi_files[$current_track_index]}"
+    next_track="${shuffled_midi_files[$((current_track_index + 1))]}"
+    current_sf2="${sf2_files[$current_sf2_index]}"
 
+    clear
+
+    echo -e "MIDI Soundfont Testing Program v1.2"
+    echo ""
+    display_metadata "$current_track" "$current_sf2" "$next_track"
+    display_menu
+    echo " "
+
+    # Start fluidsynth
+    fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &
+    fluidsynth_pid=$!
+    
+    input=$(handle_input 5)  # Wait for up to 5 seconds for user input
     if [[ "$input" == "next" ]]; then
       kill $fluidsynth_pid
       current_track_index=$((current_track_index + 1))
-      break
     elif [[ "$input" == "prev" ]]; then
       kill $fluidsynth_pid
       current_track_index=$((current_track_index - 1))
-      break
     elif [[ "$input" == "quit" ]]; then
       cleanup
       exit 0
     elif [[ "$input" == "save" ]]; then
       save_track
-      break
     elif [[ "$input" == "sf2" ]]; then
       kill $fluidsynth_pid
       current_sf2_index=$((current_sf2_index + 1))
       current_sf2_index=$((current_sf2_index % ${#sf2_files[@]}))
-      break
+    elif [[ "$input" == "" ]]; then
+        kill $fluidsynth_pid
+        current_track_index=$((current_track_index + 1))
     fi
+
   done
-done
+}
+
+play
+
+

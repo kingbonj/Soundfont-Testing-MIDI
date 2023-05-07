@@ -20,6 +20,7 @@ find_sf2_files() {
 display_metadata() {
   # Set color codes for output
   red='\033[0;31m'
+  bright_red='\033[0;91m'
   cyan='\033[0;36m'
   magenta='\033[0;35m'
   black='\033[0;30m'
@@ -95,7 +96,7 @@ handle_input() {
 
 # Function to display a menu
 display_menu() {
-  echo "(s)witch soundfont (,)previous (.)next (o)utput (q)uit"
+  echo "(s)witch soundfont (,)previous (.)next (o)utput MP3 (q)uit"
 }
 
 # Function to save the current track as an mp3
@@ -134,6 +135,14 @@ done
 # Function to clean up when the script exits
 cleanup() {
   clear
+  echo "Deleting Temporary Directories..."
+  if [[ -d "$temp_dir" ]]; then
+    rm -r "$temp_dir"
+  fi
+  if [ -d "tmp" ]; then
+    rm -r tmp
+  fi
+  find "." -type d -name 'tmp.*' -exec rm -r {} \; >/dev/null 2>&1
   echo "Stopping running processes..."
   killall fluidsynth
   if pidof pulseaudio; then
@@ -163,15 +172,32 @@ play() {
 
     clear
 
-    echo -e "MIDI Soundfont Testing Program v1.2"
+    echo -e "MIDI Soundfont Testing Program v1.3"
     echo ""
     display_metadata "$current_track" "$current_sf2" "$next_track"
+    
+    echo " "
+    if [ -f "trivia.txt" ]; then
+      echo -e "${bright_red}Trivia"
+      echo -e "------"
+      echo -e "${red}Did you know that $(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//')?\033[0m" | fold -s -w 90
+      echo " "
+    fi
     display_menu
     echo " "
 
     # Start fluidsynth
     fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &
     fluidsynth_pid=$!
+    
+    # Create a temporary directory for split MIDI files.
+    if [ ! -d "tmp" ]; then
+      mkdir tmp
+    fi
+    temp_dir=$(mktemp -d -p "$(pwd)/tmp")
+    
+    # Convert the input file to csv.
+    midicsv "$current_track" > "$temp_dir/data.csv"
     
     input=$(handle_input 5)  # Wait for up to 5 seconds for user input
     if [[ "$input" == "next" ]]; then

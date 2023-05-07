@@ -29,6 +29,8 @@ trivia.txt (optional - place in the working directory of the script)
 
 By default, the program will look for MIDI files in the `~/MIDI/` directory. You can specify a different directory by passing its path as an argument to the script. It will also search for soundfonts in the `/usr/share/sounds/sf2/` directory.
 
+If the program detects `trivia.txt` in the working directory it will display various interesting facts during playback. 
+
 The program will display the metadata for the first MIDI file in the shuffled list and start playing it using the default SoundFont.
 Use the following keys to control the program:
 

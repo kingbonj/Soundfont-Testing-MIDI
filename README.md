@@ -10,8 +10,10 @@ Before using this program, you'll need to have the following installed:
 fluidsynth
 timidity
 lame (for conversion to .mp3)
+midicsv (to handle metadata)
 find (usually included in most Linux distributions)
 shuf (usually included in most Linux distributions)
+pgrep (usually included in most Linux distributions)
 trivia.txt (optional - place in the working directory of the script)
 ```
 
@@ -39,6 +41,9 @@ Use the following keys to control the program:
 `o` : Output current track to MP3 using current soundfont. 
 
 `q` : Quit the program.
+
+## Additional
+The program will convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. This is purely for debugging, as all temporary folders are deleted on exit.
 
 ## License
 

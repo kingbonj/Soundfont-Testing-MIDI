@@ -9,14 +9,26 @@ Before using this program, you'll need to have the following installed:
 ```
 fluidsynth
 timidity
+pulseaudio
 lame (for conversion to .mp3)
-midicsv (to handle metadata)
 find (usually included in most Linux distributions)
 shuf (usually included in most Linux distributions)
 pgrep (usually included in most Linux distributions)
+midicsv (optional to handle metadata)
 trivia.txt (optional - place in the working directory of the script)
 ```
 
+Additionally, the following system packages may need to be installed:
+
+```
+libasound2-dev
+libasound2-data
+libasound2-plugins
+libfluidsynth1
+libglib2.0-dev
+libjack-dev
+libpulse-dev
+```
 
 ## Usage
 ![Screenshot 2023-05-07 22 33 07](https://user-images.githubusercontent.com/38471159/236703573-3f424a06-1703-40fe-ac5e-98d45266d16e.png)

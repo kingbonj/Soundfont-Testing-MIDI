@@ -2,6 +2,9 @@
 
 midi_dir=${1:-~/MIDI/}
 
+# Set to false to disable .csv output
+debug=false
+
 # Function to display usage
 usage() {
   echo " "
@@ -16,11 +19,14 @@ usage() {
   exit 0
 }
 
-# Check for -h parameter
+# Check for parameter
 while getopts "hd:" opt; do
   case ${opt} in
     h )
       usage
+      ;;
+    v )
+      debug=true
       ;;
     d )
       midi_dir="$OPTARG"
@@ -49,9 +55,9 @@ find_sf2_files() {
 }
 
   # Set color codes for output
-  red='\033[0;31m'
+  red='\033[3;90m'
   bright_red='\033[0;91m'
-  cyan='\033[0;36m'
+  cyan='\033[2;96m'
   magenta='\033[0;35m'
   black='\033[0;30m'
   green='\033[0;32m'
@@ -60,6 +66,7 @@ find_sf2_files() {
   purple='\033[0;35m'
   white='\033[0;37m'
   grey='\033[0;90m'
+  lgrey='\033[3;31m'
   orange='\033[0;33m'
   light_yellow='\e[93m'
   highlight='\u001b[46m'
@@ -205,44 +212,51 @@ play() {
 
     clear
 
-    echo ""
-    echo "╔╦╗╦╔╦╗╦  ╔═╗┌─┐┬ ┬┌┐┌┌┬┐┌─┐┌─┐┌┐┌┌┬┐       ╔╦╗┌─┐┌─┐┌┬┐"
-    echo "║║║║ ║║║  ╚═╗│ ││ ││││ ││├┤ │ ││││ │   ───   ║ ├┤ └─┐ │   v1.3.1"
-    echo "╩ ╩╩═╩╝╩  ╚═╝└─┘└─┘┘└┘─┴┘└  └─┘┘└┘ ┴         ╩ └─┘└─┘ ┴ "
+    echo "Midi Soundfont Testing Program v1.3.1"
     echo " "
     echo " "
     display_metadata "$current_track" "$current_sf2" "$next_track"
     echo " "
     
-    sf2_files_list=($(find /usr/share/sounds/sf2/ -type f -iname "*.sf2" -printf "%f\n"))
-  
     # Display available sf2
-    echo -e "${blue}Available Soundfonts:\n---------------------${nocolor}"
-    sf2_columns=6  # number of columns to display
+    echo -e "${blue}Available Soundfonts${nocolor}"
+    echo -e "${blue}--------------------${nocolor}"
+    
+    sf2_files_list=($(find /usr/share/sounds/sf2/ -type f -iname "*.sf2" -printf "%f\n"))
+    sf2_columns=5  # number of columns to display
+    sf2_max_per_col=$(( (${#sf2_files_list[@]} + sf2_columns - 1) / sf2_columns ))  # maximum number of items per column
     sf2_width=$(( (90 - sf2_columns + 1) / sf2_columns ))  # width of each column, including the tab character
-    for (( i=0; i<${#sf2_files_list[@]}; i++ )); do
-      sf2="${sf2_files_list[$i]}"
-      if [[ "$sf2" == "$sf2_basename" ]]; then
-        # Highlight the current .sf2 file in the list using ANSI color codes
-        printf "${nocolor}${highlight}"
-      else
-        printf "${grey}"
-      fi
-      printf "%-${sf2_width}s" "$sf2"
-      if [[ "$(( (i+1) % sf2_columns ))" -eq 0 || "$i" -eq "$((${#sf2_files_list[@]}-1))" ]]; then
-        printf "${nocolor}\n"
-      else
-        printf "\t"
-      fi
+    
+    for (( col=0; col<sf2_columns; col++ )); do
+      for (( row=0; row<sf2_max_per_col; row++ )); do
+        index=$((col * sf2_max_per_col + row))
+        if [[ "$index" -lt "${#sf2_files_list[@]}" ]]; then
+          sf2="${sf2_files_list[$index]}"
+          if [[ "$sf2" == "$sf2_basename" ]]; then
+            # Highlight the current .sf2 file in the list using ANSI color codes
+            printf "${nocolor}${highlight}"
+          else
+            printf "${grey}"
+          fi
+          printf "%-${sf2_width}s" "$sf2"
+          printf "${nocolor}\t"
+        else
+          # Print empty space to fill the last row
+          printf "%-${sf2_width}s" ""
+          printf "${nocolor}\t"
+        fi
+      done
+      printf "\n"
     done
 
-    
+
+
     echo " "
     if [ -f "trivia.txt" ]; then
-      echo -e "${red}Trivia"
+      echo -e "${bright_red}Trivia"
       echo -e "------"
-      echo -e "${grey}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
-      echo " "
+      echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
+      echo -e "${nocolor} "
     fi
     display_menu
       echo " "
@@ -251,7 +265,19 @@ play() {
     fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &
     fluidsynth_pid=$!
   
-    input=$(handle_input 5)  # Wait for up to 5 seconds for user input
+    if [ "$debug" = true ]; then
+      echo " "
+      # create tmp directory if it doesn't exist and create temporary directory inside tmp
+      mkdir -p tmp
+      temp_dir=$(mktemp -d -p "$(pwd)/tmp")
+      echo -e "${grey}Temporary working directory: $temp_dir"
+      
+      # convert to CSV
+      midicsv "$current_track" > "$temp_dir/data.csv"
+      echo -e "Converted .mid to .csv > $temp_dir""/data.csv ${nocolor}"
+    fi
+  
+    input=$(handle_input 2)  # Wait for up to 5 seconds for user input
     if [[ "$input" == "next" ]]; then
       kill $fluidsynth_pid
       current_track_index=$((current_track_index + 1))
@@ -271,10 +297,11 @@ play() {
         kill $fluidsynth_pid
         current_track_index=$((current_track_index + 1))
     fi
-
+  
   done
-        echo " "
-
+  
+  echo " "
+        
 }
 
 play

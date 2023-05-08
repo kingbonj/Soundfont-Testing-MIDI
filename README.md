@@ -1,7 +1,7 @@
 # MIDI Soundfont Testing Program
 This program is designed to be run in a Bash terminal and requires the fluidsynth and lame packages to be installed on your system. It supports playing MIDI files with different SoundFonts and provides basic controls for switching between tracks and SoundFonts. Additionally, it allows for MP3 export via lame. The program is particularly useful for testing .sf2 soundfonts, but can also be used as a general media player for your MIDI files. Optionally, the program can display interesting facts and trivia as you listen.  
 
-![Screenshot 2023-05-07 22 30 54](https://user-images.githubusercontent.com/38471159/236703500-fe44802b-1469-4476-b8dc-ae6841e0b899.png)
+![Screenshot 2023-05-08 12 53 05](https://user-images.githubusercontent.com/38471159/236817091-e4550aa2-7ecb-4dd3-8378-435185aa818e.png)
 
 ## Prerequisites
 Before using this program, you'll need to have the following installed:

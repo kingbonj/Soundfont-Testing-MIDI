@@ -10,6 +10,7 @@ Before using this program, you'll need at least one MIDI file and a .sf2 soundfo
 fluidsynth
 timidity
 pulseaudio
+libnotify-bin (for desktop notifications)
 lame (for conversion to .mp3)
 find (usually included in most Linux distributions)
 shuf (usually included in most Linux distributions)

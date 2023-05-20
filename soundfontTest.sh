@@ -216,6 +216,8 @@ play() {
     echo " "
     echo " "
     display_metadata "$current_track" "$current_sf2" "$next_track"
+    echo -e "Track ${yellow}$((current_track_index + 1)) ${nocolor}of ${yellow}${#shuffled_midi_files[@]}${nocolor}"
+
     echo " "
     
     # Display available sf2
@@ -249,8 +251,6 @@ play() {
       printf "\n"
     done
 
-
-
     echo " "
     if [ -f "trivia.txt" ]; then
       echo -e "${bright_red}Trivia"
@@ -264,6 +264,7 @@ play() {
     # Start fluidsynth
     fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &
     fluidsynth_pid=$!
+    # notify-send "Soundfont Test Playing" "$current_track"
   
     if [ "$debug" = true ]; then
       echo " "
@@ -289,6 +290,7 @@ play() {
       exit 0
     elif [[ "$input" == "save" ]]; then
       save_track
+      notify-send "Track saved to MP3" "$current_track"
     elif [[ "$input" == "sf2" ]]; then
       kill $fluidsynth_pid
       current_sf2_index=$((current_sf2_index + 1))

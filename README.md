@@ -61,10 +61,10 @@ Use the following keys to control the program:
 `q` : Quit the program.
 
 ## Additional
-If the `debug` string is set to `true` the program will also convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. At this time, this feature is purely for debugging. All temporary folders are deleted on exit.
+The program will also convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. All temporary folders are deleted on exit.
 
 ## Bugs/Other
-The program checks for instances of fluidsynth using pgrep. If no psid is found it will skip to the next track and begin playback. This means that if fluidsynth is already running, or if it does not close properly, the automatic playback function will stop working. To fix this use `pgrep fluidsynth` to determine the psid, and kill the process manually before re-running the script.  
+Please report any unexpected bugs!
 
 ## License
 

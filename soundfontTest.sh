@@ -137,12 +137,23 @@ display_metadata() {
   printf "${blue}%-${col_width}s ${yellow}%-${col_width}s ${magenta}%-${col_width}s ${nocolor}\n" "---------" "-----" "----------"
   
   # Print wrapped and padded text for each row
-  for ((i=1; i<=6; i++)); do
+# Determine the maximum width needed for each column
+max_sf2_width=$(echo "$sf2_text" | awk '{if (length > max) max = length} END {print max}')
+max_track_width=$(echo "$track_text" | awk '{ print length, $0 }' | sort -n | tail -1 | cut -d' ' -f1)
+max_next_track_width=$(echo "$next_track_text" | awk '{ print length, $0 }' | sort -n | tail -1 | cut -d' ' -f1)
+
+# Define the column widths, ensuring they're sufficiently large
+col_width_sf2=$((max_sf2_width))  # Add padding
+col_width_track=$((max_track_width))  # Add padding
+col_width_next_track=$((max_next_track_width))  # Add padding
+
+for ((i=1; i<=6; i++)); do
     sf2_row=$(echo "$sf2_text" | sed "${i}q;d")
     track_row=$(echo "$track_text" | sed "${i}q;d")
     next_track_row=$(echo "$next_track_text" | sed "${i}q;d")
-    printf "${cyan}%-${col_width}s ${light_yellow}%-${col_width}s ${grey}%-${col_width}s ${nocolor}\n" "$sf2_row" "$track_row" "$next_track_row"
-  done
+    
+    printf "${cyan}%-${col_width_sf2}s ${light_yellow}%-${col_width_track}s ${grey}%-${col_width_next_track}s ${nocolor}\n" "$sf2_row" "$track_row" "$next_track_row"
+done
   
   # Add empty line at the end
   printf "\n"
@@ -292,20 +303,20 @@ play() {
           printf "${nocolor}\t"
         fi
       done
-      printf "\n"
     done
 
 
 
 if [[ -f "trivia.txt" ]]; then
+    echo -e " "
     echo -e "${bright_red}Trivia"
     echo -e "------"
     echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
     echo -e "${nocolor} "
     
 else
-
-echo -e "${bright_red}Metadata"
+    echo -e " "
+    echo -e "${bright_red}Metadata"
     echo -e "--------"
     midicsv "$current_track" > "$temp_dir/data.csv"
     # echo "trivia.txt not found (deprecated in v1.4)"
@@ -313,8 +324,8 @@ echo -e "${bright_red}Metadata"
 metadata=$(strings "$temp_dir/data.csv" | grep -a -E "Text_t|Copyright|Composer|Album|Title|Track_name|Lyrics|Metaeventtext|Marker" \
 | sed -E 's/.*"(.*)"/\1/' | grep -v -E '^\s*$' \
 | grep -v -E '^[^a-zA-Z0-9]+$' \
-| grep -v -E '(Piano|Guitar|Brass|Bass|Drum|Trombone|Violin|Sax|Trumpet|Percussion|Organ|Flute|Clarinet|Harp|Synth|Strings|Vibraphone|Accordion|Timpani|Cello|Contrabass|Fiddle|Voice|Chime|Xylophone|Bell|Cymbal|Tom|Snare|Congas|Tambourine|Oboe|French Horn|Tuba|Sitar|Kalimba|Shamisen|Bagpipe|Maracas|Whistle|Guiro|Claves|Conga|Cuica|Triangle|Woodblock|Bongo)' \
-| grep -E '.{4,}')
+| grep -v -E '(Piano|Guitar|Brass|Bass|Drum|Trombone|Violin|Sax|Trumpet|Percussion|Organ|Flute|Clarinet|Harp|Synth|Strings|Vibraphone|Accordion|Timpani|Cello|Contrabass|Fiddle|Voice|Chime|Xylophone|Bell|Cymbal|Tom|Snare|Congas|Tambourine|Lead|Echo|Left Hand|Right Hand|Oboe|French Horn|Tuba|Sitar|Kalimba|Shamisen|Bagpipe|Maracas|Whistle|Guiro|Claves|Conga|Cuica|Triangle|Woodblock|NoteWorthy Composer|Bongo|Track|Staff|Melody|Copyright_t)' \
+| grep -E '.{3,}')
     echo "$metadata"
 # Check if metadata is empty
 if [ -z "$metadata" ]; then
@@ -374,3 +385,5 @@ fi
 }
 
 play
+
+

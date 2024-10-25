@@ -9,7 +9,7 @@ required_commands=(
   "find"
   "shuf"
   "pgrep"
-  "midicsv"  # Optional for metadata handling
+  "midicsv"
 )
 
 # Function to check if all required software is installed

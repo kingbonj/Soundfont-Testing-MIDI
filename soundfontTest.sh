@@ -4,7 +4,7 @@
 required_commands=(
   "fluidsynth"
   "timidity"
-  "pulseaudio"
+  "strings"
   "lame"
   "find"
   "shuf"
@@ -27,7 +27,7 @@ check_requirements() {
     for cmd in "${missing[@]}"; do
       echo "  - $cmd"
     done
-    echo "Please install the missing software and try again."
+    echo "Please install the missing software and try again. Note 'strings' is part of the 'binutils' package"
     exit 1
   fi
 }
@@ -295,26 +295,33 @@ play() {
       printf "\n"
     done
 
-    echo " "
-    if [ -f "trivia.txt" ]; then
-      echo -e "${bright_red}Metadata"
-      echo -e "--------"
-      midicsv "$current_track" > "$temp_dir/data.csv"
-      # grep "Text_t" $temp_dir/data.csv | sed 's/.*Text_t, "\(.*\)"/\1/'
+
+
+if [[ -f "trivia.txt" ]]; then
+    echo -e "${bright_red}Trivia"
+    echo -e "------"
+    echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
+    echo -e "${nocolor} "
+    
+else
+
+echo -e "${bright_red}Metadata"
+    echo -e "--------"
+    midicsv "$current_track" > "$temp_dir/data.csv"
+    # echo "trivia.txt not found (deprecated in v1.4)"
+
 metadata=$(strings "$temp_dir/data.csv" | grep -a -E "Text_t|Copyright|Composer|Album|Title|Track_name|Lyrics|Metaeventtext|Marker" \
 | sed -E 's/.*"(.*)"/\1/' | grep -v -E '^\s*$' \
 | grep -v -E '^[^a-zA-Z0-9]+$' \
 | grep -v -E '(Piano|Guitar|Brass|Bass|Drum|Trombone|Violin|Sax|Trumpet|Percussion|Organ|Flute|Clarinet|Harp|Synth|Strings|Vibraphone|Accordion|Timpani|Cello|Contrabass|Fiddle|Voice|Chime|Xylophone|Bell|Cymbal|Tom|Snare|Congas|Tambourine|Oboe|French Horn|Tuba|Sitar|Kalimba|Shamisen|Bagpipe|Maracas|Whistle|Guiro|Claves|Conga|Cuica|Triangle|Woodblock|Bongo)' \
 | grep -E '.{4,}')
-
+    echo "$metadata"
 # Check if metadata is empty
 if [ -z "$metadata" ]; then
   echo -e "${bright_red}**NO METADATA AVAILABLE FOR THIS MIDI**${nocolor}"
-else
   echo "$metadata"
 fi
       
-# echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90    
       echo -e "${nocolor} "
     fi
     display_menu

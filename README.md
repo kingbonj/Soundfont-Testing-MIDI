@@ -17,6 +17,7 @@ find (usually included in most Linux distributions)
 shuf (usually included in most Linux distributions)
 pgrep (usually included in most Linux distributions)
 midicsv (optional to handle metadata)
+binutils (required for strings to function correctly)
 trivia.txt (optional and no longer used as of v1.4 - place in the working directory of the script)
 ```
 

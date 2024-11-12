@@ -64,8 +64,7 @@ Use the following keys to control the program:
 The program will also convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. All temporary folders are deleted on exit.
 
 ## Bugs/Other
-Please report any unexpected bugs!
-Fornat and content of metadata output results will vary depending on the tags provided, unfortunately there is nothing that can be done to elimenate instruments with uncommon or custom names. 
+Format and content of metadata output results will vary depending on the tags provided, unfortunately there is nothing that can be done to elimenate instruments with uncommon or custom names. Please report any other unexpected bugs!
 
 ## License
 

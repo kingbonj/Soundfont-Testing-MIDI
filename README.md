@@ -65,6 +65,7 @@ The program will also convert the MIDI file to .csv and store them in newly crea
 
 ## Bugs/Other
 Please report any unexpected bugs!
+Fornat and content of metadata output results will vary depending on the tags provided, unfortunately there is nothing that can be done to elimenate instruments with uncommon or custom names. 
 
 ## License
 

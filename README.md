@@ -33,7 +33,7 @@ libpulse-dev
 ```
 
 ## Usage
-<img src="https://user-images.githubusercontent.com/38471159/236703573-3f424a06-1703-40fe-ac5e-98d45266d16e.png" width="500" height="150">
+<img src="https://github.com/user-attachments/assets/46b5ff33-af2b-4892-9aef-2d0a69c08c8a" width="500" height="350">
 
 1. Clone the repository or download the `midi_soundfont_test.sh` script.
 2. Open a terminal and navigate to the directory where the script is located.

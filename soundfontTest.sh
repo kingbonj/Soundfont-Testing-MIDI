@@ -40,7 +40,7 @@ midi_dir=${1:-~/MIDI/}
 # Set to false to disable .csv output
 debug=false
 
-#Set version
+# Set version
 version="1.4"
 
 # Function to display usage
@@ -78,8 +78,8 @@ done
 shift $((OPTIND -1))
 
 mkdir -p tmp
-      temp_dir=$(mktemp -d -p "$(pwd)/tmp")
-      echo -e "${grey}Temporary working directory: $temp_dir"
+temp_dir=$(mktemp -d -p "$(pwd)/tmp")
+echo -e "${grey}Temporary working directory: $temp_dir"
 
 # Kill fluidsynth
 killall fluidsynth >/dev/null 2>&1
@@ -96,102 +96,159 @@ find_sf2_files() {
   find /usr/share/sounds/sf2/ -type f -iname "*.sf2"
 }
 
-  # Set color codes for output
-  red='\033[3;90m'
-  bright_red='\033[0;91m'
-  cyan='\033[2;96m'
-  magenta='\033[0;35m'
-  black='\033[0;30m'
-  green='\033[0;32m'
-  yellow='\033[0;33m'
-  blue='\033[0;34m'
-  purple='\033[0;35m'
-  white='\033[0;37m'
-  grey='\033[0;90m'
-  lgrey='\033[3;31m'
-  orange='\033[0;33m'
-  light_yellow='\e[1;93m'
-  highlight='\u001b[46m'
-  nocolor='\033[0m'
+# Set color codes for output
+red=$'\033[3;90m'
+bright_red=$'\033[0;91m'
+cyan=$'\033[2;96m'
+magenta=$'\033[0;35m'
+black=$'\033[0;30m'
+green=$'\033[0;32m'
+yellow=$'\033[0;33m'
+blue=$'\033[0;34m'
+purple=$'\033[0;35m'
+white=$'\033[0;37m'
+grey=$'\033[0;90m'
+lgrey=$'\033[3;31m'
+orange=$'\033[1;33m'
+light_yellow=$'\033[1;93m'
+highlight=$'\033[46m'
+nocolor=$'\033[0m'
+
+# Function to repeat a character
+repeat_char() {
+  for ((i=0; i<$1; i++)); do
+    printf '%s' "$2"
+  done
+}
 
 display_metadata() {
+  # Set fixed content widths for columns
+  content_width_sf2=28
+  content_width_track=28
+  content_width_next_track=28
+
+  # Total column widths including padding and borders
+  col_width_sf2=$((content_width_sf2 + 2))         # Add padding spaces
+  col_width_track=$((content_width_track + 2))
+  col_width_next_track=$((content_width_next_track + 2))
+
   # Extract the directory and file name from the track path
   track_name=$(basename "$1")
   track_dir=$(basename "$(dirname "$1")")
-  
-  # Set maximum width for each column
-  col_width=30
-  
-  # Wrap long text using fold command
-  sf2_text=$(echo -e "$2" | fold -s -w $col_width)
-  track_text=$(echo -e "$track_dir/$track_name" | fold -s -w $col_width)  # Include directory and track name
-  next_track_text=$(echo -e "$(basename "$(dirname "$3")")/$(basename "$3")" | fold -s -w $col_width)
-  
-  # Pad shorter text with spaces to fill the column width
-  sf2_text=$(printf "%-${col_width}s" "$sf2_text")
-  track_text=$(printf "%-${col_width}s" "$track_text")
-  next_track_text=$(printf "%-${col_width}s" "$next_track_text")
-  
-  # Print table headers
-  printf "${blue}%-${col_width}s ${yellow}%-${col_width}s ${magenta}%-${col_width}s ${nocolor}\n" "SoundFont" "Track" "Next Track"
-  printf "${blue}%-${col_width}s ${yellow}%-${col_width}s ${magenta}%-${col_width}s ${nocolor}\n" "---------" "-----" "----------"
-  
-  # Print wrapped and padded text for each row
-# Determine the maximum width needed for each column
-max_sf2_width=$(echo "$sf2_text" | awk '{if (length > max) max = length} END {print max}')
-max_track_width=$(echo "$track_text" | awk '{ print length, $0 }' | sort -n | tail -1 | cut -d' ' -f1)
-max_next_track_width=$(echo "$next_track_text" | awk '{ print length, $0 }' | sort -n | tail -1 | cut -d' ' -f1)
 
-# Define the column widths, ensuring they're sufficiently large
-col_width_sf2=$((max_sf2_width))  # Add padding
-col_width_track=$((max_track_width))  # Add padding
-col_width_next_track=$((max_next_track_width))  # Add padding
+  # Prepare the text for each column
+  sf2_text="$2"
+  track_text="$track_dir/$track_name"
+  next_track_text="$(basename "$(dirname "$3")")/$(basename "$3")"
 
-for ((i=1; i<=6; i++)); do
-    sf2_row=$(echo "$sf2_text" | sed "${i}q;d")
-    track_row=$(echo "$track_text" | sed "${i}q;d")
-    next_track_row=$(echo "$next_track_text" | sed "${i}q;d")
-    
-    printf "${cyan}%-${col_width_sf2}s ${light_yellow}%-${col_width_track}s ${grey}%-${col_width_next_track}s ${nocolor}\n" "$sf2_row" "$track_row" "$next_track_row"
-done
-  
-  # Add empty line at the end
-  printf "\n"
+  # Wrap text to fixed width per line
+  sf2_lines=()
+  while IFS= read -r line; do
+    sf2_lines+=("$line")
+  done < <(echo "$sf2_text" | fold -s -w $content_width_sf2)
+
+  track_lines=()
+  while IFS= read -r line; do
+    track_lines+=("$line")
+  done < <(echo "$track_text" | fold -s -w $content_width_track)
+
+  next_track_lines=()
+  while IFS= read -r line; do
+    next_track_lines+=("$line")
+  done < <(echo "$next_track_text" | fold -s -w $content_width_next_track)
+
+  # Determine the maximum number of lines
+  max_lines=${#sf2_lines[@]}
+  if [ ${#track_lines[@]} -gt $max_lines ]; then
+    max_lines=${#track_lines[@]}
+  fi
+  if [ ${#next_track_lines[@]} -gt $max_lines ]; then
+    max_lines=${#next_track_lines[@]}
+  fi
+
+  # Print top border
+  printf "${blue}╔"
+  repeat_char $col_width_sf2 '═'
+  printf "╦"
+  repeat_char $col_width_track '═'
+  printf "╦"
+  repeat_char $col_width_next_track '═'
+  printf "╗${nocolor}\n"
+
+  # Print headers
+  printf "${blue}║${white} %-*s ${blue}║${white} %-*s ${blue}║${white} %-*s ${blue}║${nocolor}\n" \
+    $content_width_sf2 "SoundFont" \
+    $content_width_track "Track" \
+    $content_width_next_track "Next Track"
+
+  # Print header separator
+  printf "${blue}╠"
+  repeat_char $col_width_sf2 '═'
+  printf "╬"
+  repeat_char $col_width_track '═'
+  printf "╬"
+  repeat_char $col_width_next_track '═'
+  printf "╣${nocolor}\n"
+
+  # Print data rows
+  for ((i=0; i<$max_lines; i++)); do
+    sf2_line="${sf2_lines[$i]}"
+    track_line="${track_lines[$i]}"
+    next_track_line="${next_track_lines[$i]}"
+    sf2_line=${sf2_line:-""}
+    track_line=${track_line:-""}
+    next_track_line=${next_track_line:-""}
+
+    printf "${blue}║ ${green}%-*s${blue} ║ ${yellow}%-*s${blue} ║ ${magenta}%-*s${blue} ║${nocolor}\n" \
+      $content_width_sf2 "$sf2_line" \
+      $content_width_track "$track_line" \
+      $content_width_next_track "$next_track_line"
+  done
+
+  # Print bottom border
+  printf "${blue}╚"
+  repeat_char $col_width_sf2 '═'
+  printf "╩"
+  repeat_char $col_width_track '═'
+  printf "╩"
+  repeat_char $col_width_next_track '═'
+  printf "╝${nocolor}\n"
+
 }
 
 handle_input() {
-    while [ -n "$(pgrep fluidsynth)" ]; do
-        read -rsn1 -t 1 input
-        if [[ "$input" == "." ]]; then
-            echo "next"
-            return 0
-        elif [[ "$input" == "," ]]; then
-            echo "prev"
-            return 0
-        elif [[ "$input" == "s" ]]; then
-            echo "sf2"
-            return 0
-        elif [[ "$input" == "o" ]]; then
-            echo "save"
-            return 0
-        elif [[ "$input" == "q" ]]; then
-            echo "quit"
-            return 0
-        fi
-    done
+  while [ -n "$(pgrep fluidsynth)" ]; do
+    read -rsn1 -t 1 input
+    if [[ "$input" == "." ]]; then
+      echo "next"
+      return 0
+    elif [[ "$input" == "," ]]; then
+      echo "prev"
+      return 0
+    elif [[ "$input" == "s" ]]; then
+      echo "sf2"
+      return 0
+    elif [[ "$input" == "o" ]]; then
+      echo "save"
+      return 0
+    elif [[ "$input" == "q" ]]; then
+      echo "quit"
+      return 0
+    fi
+  done
 
-# If fluidsynth is not running, return an empty string
-    echo ""
-    return 0
+  # If fluidsynth is not running, return an empty string
+  echo ""
+  return 0
 }
-
 
 # Function to display a menu
 display_menu() {
-  echo " "
-  echo "Controls"
-  echo "--------"
-  printf "(s)witch soundfont\t(,)previous\t(.)next\t\t(o)utput MP3\t(q)uit"
+  echo "╔════════════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║                                         Controls                                           ║"
+  echo "╠════════════════════════════════════════════════════════════════════════════════════════════╣"
+  echo "║            (s)witch soundfont   (,)previous   (.)next   (o)utput MP3   (q)uit              ║"
+  echo "╚════════════════════════════════════════════════════════════════════════════════════════════╝"
 }
 
 # Function to save the current track as an mp3
@@ -201,27 +258,23 @@ save_track() {
     *.MID) current_track_basename=$(basename "$current_track" .MID);;
     *) echo "Error: Invalid file extension for MIDI file.";;
   esac
-  current_track_basename=$(basename "$current_track" .mid)
   sf2_basename=$(basename "$current_sf2")
   sf2_basename="${sf2_basename%.*}"
   output_dir="$(dirname "$0")/Output"
   output_file="$output_dir/$current_track_basename-$sf2_basename.mp3"
 
-# Kill fluidsynth to ensure that the correct soundfont is used for conversion
+  # Kill fluidsynth to ensure that the correct soundfont is used for conversion
   killall fluidsynth >/dev/null 2>&1
 
-# Create Output folder if it doesn't exist
+  # Create Output folder if it doesn't exist
   if [ ! -d "$output_dir" ]; then
     mkdir "$output_dir"
   fi
 
   echo "Saving track as $output_file..."
   sf2_current=$(basename "$current_sf2" .sf2)
-  fluidsynth -F "$output_dir/$current_track_basename-$sf2_current.wav" "$current_sf2" "$current_track" | lame - "$output_file"
-  find "$output_dir" -type f -name '*.wav' | while read file; do
-    output_file="${file%.*}.mp3"
-    lame "$file" "$output_file"
-done
+  fluidsynth -F "$output_dir/$current_track_basename-$sf2_current.wav" "$current_sf2" "$current_track"
+  lame "$output_dir/$current_track_basename-$sf2_current.wav" "$output_file"
   echo "Track saved to $output_dir."
   echo "Cleaning up temporary files..."
   rm "$output_dir"/*.wav
@@ -261,129 +314,108 @@ current_sf2_index=0
 play() {
   while true; do
     current_track="${shuffled_midi_files[$current_track_index]}"
-    next_track="${shuffled_midi_files[$((current_track_index + 1))]}"
+    next_track="${shuffled_midi_files[$(( (current_track_index + 1) % ${#shuffled_midi_files[@]} ))]}"
     current_sf2="${sf2_files[$current_sf2_index]}"
     sf2_basename=$(basename "$current_sf2")
-
     clear
-
-    echo "Midi Soundfont Testing Program v$version"
-    echo " "
-    echo " "
+    echo "╔════════════════════════════════════════════════════════════════════════════════════════════╗${nocolor}"
+    printf "║${nocolor}                             MIDI Soundfont Testing Program v$version                            ║${nocolor}\n"
+    echo "╚════════════════════════════════════════════════════════════════════════════════════════════╝${nocolor}"
+        echo -e " Playing Track ${orange}$((current_track_index + 1))${nocolor} of ${orange}${#shuffled_midi_files[@]}${nocolor}"
     display_metadata "$current_track" "$current_sf2" "$next_track"
-    echo -e "Track ${yellow}$((current_track_index + 1)) ${nocolor}of ${yellow}${#shuffled_midi_files[@]}${nocolor}"
 
-    echo " "
     
-# Display available sf2
-    echo -e "${blue}Available Soundfonts${nocolor}"
-    echo -e "${blue}--------------------${nocolor}"
+    # Display available sf2
+    echo -e "${blue}╔════════════════════════════════════════════════════════════════════════════════════════════╗${nocolor}"
+    echo -e "${blue}║ ${white}                                  Available Soundfonts${blue}                                     ║"
+    echo -e "${blue}╚════════════════════════════════════════════════════════════════════════════════════════════╝${nocolor}"
     
     sf2_files_list=($(find /usr/share/sounds/sf2/ -type f -iname "*.sf2" -printf "%f\n"))
-    sf2_columns=5  # number of columns to display
+    sf2_columns=3  # number of columns to display
     sf2_max_per_col=$(( (${#sf2_files_list[@]} + sf2_columns - 1) / sf2_columns ))  # maximum number of items per column
-    sf2_width=$(( (90 - sf2_columns + 1) / sf2_columns ))  # width of each column, including the tab character
+    sf2_width=$(( (60 - sf2_columns + 1) / sf2_columns ))  # width of each column, including the tab character
     
-    for (( col=0; col<sf2_columns; col++ )); do
-      for (( row=0; row<sf2_max_per_col; row++ )); do
+    for (( row=0; row<sf2_max_per_col; row++ )); do
+      for (( col=0; col<sf2_columns; col++ )); do
         index=$((col * sf2_max_per_col + row))
         if [[ "$index" -lt "${#sf2_files_list[@]}" ]]; then
           sf2="${sf2_files_list[$index]}"
-          if [[ "$sf2" == "$sf2_basename" ]]; then            
-# Highlight the current .sf2 file in the list using ANSI color codes
-            printf "${nocolor}${highlight}"
+          if [[ "$sf2" == "$sf2_basename" ]]; then
+            # Highlight the current .sf2 file in the list using ANSI color codes
+            printf "${white}[${blue}%-*s${white}]${nocolor} " $((sf2_width - 2)) "$sf2"
           else
-            printf "${grey}"
+            printf "${grey} %-*s ${nocolor}" $((sf2_width)) "$sf2"
           fi
-          printf "%-${sf2_width}s" "$sf2"
-          printf "${nocolor}\t"
         else
-# Print empty space to fill the last row
-          printf "%-${sf2_width}s" ""
-          printf "${nocolor}\t"
+          # Print empty space to fill the last row
+          printf "%-*s" $((sf2_width + 2)) ""
         fi
       done
+      echo
     done
 
-
-
-if [[ -f "trivia.txt" ]]; then
-    echo -e " "
-    echo -e "${bright_red}Trivia"
-    echo -e "------"
-    echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').\033[0m" | fold -s -w 90
-    echo -e "${nocolor} "
-    
-else
-    echo -e " "
-    echo -e "${bright_red}Metadata"
-    echo -e "--------"
-    midicsv "$current_track" > "$temp_dir/data.csv"
-    # echo "trivia.txt not found (deprecated in v1.4)"
-
-metadata=$(strings "$temp_dir/data.csv" | grep -a -E "Text_t|Copyright|Composer|Album|Title|Track_name|Lyrics|Metaeventtext|Marker" \
-| sed -E 's/.*"(.*)"/\1/' | grep -v -E '^\s*$' \
-| grep -v -E '^[^a-zA-Z0-9]+$' \
-| grep -v -E '(Piano|Guitar|Brass|Bass|Drum|Trombone|Violin|Sax|Trumpet|Percussion|Organ|Flute|Clarinet|Harp|Synth|Strings|Vibraphone|Accordion|Timpani|Cello|Contrabass|Fiddle|Voice|Chime|Xylophone|Bell|Cymbal|Tom|Snare|Congas|Tambourine|Lead|Echo|Left Hand|Right Hand|Oboe|French Horn|Tuba|Sitar|Kalimba|Shamisen|Bagpipe|Maracas|Whistle|Guiro|Claves|Conga|Cuica|Triangle|Woodblock|NoteWorthy Composer|Bongo|Track|Staff|Melody|Copyright_t)' \
-| grep -E '.{3,}')
-    echo "$metadata"
-# Check if metadata is empty
-if [ -z "$metadata" ]; then
-  echo -e "${bright_red}**NO METADATA AVAILABLE FOR THIS MIDI**${nocolor}"
-  echo "$metadata"
-fi
-      
+    if [[ -f "trivia.txt" ]]; then
+      echo -e " "
+      echo -e "${bright_red}Trivia"
+      echo -e "------"
+      echo -e "${red}$(shuf -n 1 trivia.txt | tr -d '\r' | sed 's/^ *//;s/ *$//' | sed 's/.\{1\}$//').${nocolor}" | fold -s -w 90
       echo -e "${nocolor} "
+    else
+    echo -e "${bright_red}╔════════════════════════════════════════════════════════════════════════════════════════════╗${nocolor}"
+    echo -e "${bright_red}║ ${white}                                        Metadata${bright_red}                                           ║"
+    echo -e "${bright_red}╚════════════════════════════════════════════════════════════════════════════════════════════╝${nocolor}"
+      midicsv "$current_track" > "$temp_dir/data.csv"
+
+      metadata=$(strings "$temp_dir/data.csv" | grep -a -E "Text_t|Copyright|Composer|Album|Title|Track_name|Lyrics|Metaeventtext|Marker" \
+      | sed -E 's/.*"(.*)"/\1/' | grep -v -E '^\s*$' \
+      | grep -v -E '^[^a-zA-Z0-9]+$' \
+      | grep -v -E '(Piano|Guitar|Brass|Bass|Drum|Trombone|Violin|Sax|Trumpet|Percussion|Organ|Flute|Clarinet|Harp|Synth|Strings|Vibraphone|Accordion|Timpani|Cello|Contrabass|Fiddle|Voice|Chime|Xylophone|Bell|Cymbal|Tom|Snare|Congas|Tambourine|Lead|Echo|Left Hand|Right Hand|Oboe|French Horn|Tuba|Sitar|Kalimba|Shamisen|Bagpipe|Maracas|Whistle|Guiro|Claves|Conga|Cuica|Triangle|Woodblock|NoteWorthy Composer|Bongo|Track|Staff|Melody|Copyright_t)' \
+      | grep -E '.{3,}')
+      if [ -z "$metadata" ]; then
+        echo -e "${bright_red}**NO METADATA AVAILABLE FOR THIS MIDI**${nocolor}"
+      fi
+      if [ ! -z "$metadata" ]; then
+        echo -e "${bright_red}$metadata${nocolor}"
+      fi
     fi
     display_menu
-      echo " "
 
-# Start fluidsynth
+    # Start fluidsynth
     fluidsynth -a pulseaudio -m alsa_seq -l -i "$current_sf2" "$current_track" >/dev/null 2>&1 &
     fluidsynth_pid=$!
 
-# notify-send "Soundfont Test Playing" "$current_track"  
-    if [ "$debug" = true ]; then
-      echo " "
-
-# create tmp directory if it doesn't exist and create temporary directory inside tmp
-      mkdir -p tmp
-      temp_dir=$(mktemp -d -p "$(pwd)/tmp")
-      echo -e "${grey}Temporary working directory: $temp_dir"
-      
-# convert to CSV
-      midicsv "$current_track" > "$temp_dir/data.csv"
-      echo -e "Converted .mid to .csv > $temp_dir""/data.csv ${nocolor}"
-    fi
-  
-    input=$(handle_input 2)  # Wait for up to 5 seconds for user input
+    # Wait for user input
+    input=$(handle_input 2)
     if [[ "$input" == "next" ]]; then
       kill $fluidsynth_pid
       current_track_index=$((current_track_index + 1))
+      if (( current_track_index >= ${#shuffled_midi_files[@]} )); then
+        current_track_index=0
+      fi
     elif [[ "$input" == "prev" ]]; then
       kill $fluidsynth_pid
       current_track_index=$((current_track_index - 1))
+      if (( current_track_index < 0 )); then
+        current_track_index=$((${#shuffled_midi_files[@]} - 1))
+      fi
     elif [[ "$input" == "quit" ]]; then
       cleanup
       exit 0
     elif [[ "$input" == "save" ]]; then
       save_track
-      notify-send "Track saved to MP3" "$current_track"
     elif [[ "$input" == "sf2" ]]; then
       kill $fluidsynth_pid
       current_sf2_index=$((current_sf2_index + 1))
       current_sf2_index=$((current_sf2_index % ${#sf2_files[@]}))
     elif [[ "$input" == "" ]]; then
-        kill $fluidsynth_pid
-        current_track_index=$((current_track_index + 1))
+      kill $fluidsynth_pid
+      current_track_index=$((current_track_index + 1))
+      if (( current_track_index >= ${#shuffled_midi_files[@]} )); then
+        current_track_index=0
+      fi
     fi
   
   done
-  
-  echo " "
-        
 }
 
 play
-
-

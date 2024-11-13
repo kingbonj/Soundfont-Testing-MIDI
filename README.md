@@ -74,6 +74,11 @@ Ensure that the following dependencies are installed:
 ```
 Python 3
 PyGObject (to provide GTK support)
+gir1.2-gtk-3.0
+libglib2.0-dev
+libasound2-dev
+libjack-dev
+libpulse-dev
 fluidsynth, timidity, lame, midicsv, shuf, and other system tools as required in the Bash version)
 ```
 

@@ -17,7 +17,6 @@ shuf (usually included in most Linux distributions)
 pgrep (usually included in most Linux distributions)
 midicsv (optional to handle metadata)
 binutils (required for strings to function correctly)
-trivia.txt (optional and no longer used as of v1.4 - place in the working directory of the script)
 ```
 
 Additionally, the following system packages _may_ need to be installed:
@@ -32,7 +31,10 @@ libjack-dev
 libpulse-dev
 ```
 
+The script looks for MIDI files in the ~/MIDI/ directory by default, and it searches for .sf2 SoundFonts in the /usr/share/sounds/sf2/ directory.
+
 ## Usage
+### Bash Version
 <img src="https://github.com/user-attachments/assets/46b5ff33-af2b-4892-9aef-2d0a69c08c8a" width="500" height="350">
 
 1. Clone the repository or download the `midi_soundfont_test.sh` script.
@@ -44,8 +46,6 @@ libpulse-dev
 ```
 
 By default, the program will look for MIDI files in the `~/MIDI/` directory. You can specify a different directory by passing its path as an argument to the script. It will also search for soundfonts in the `/usr/share/sounds/sf2/` directory.
-
-~~If the program detects `trivia.txt` in the working directory it will display various interesting facts during playback.~~ 
 
 The program will find the first MIDI file in the shuffled list and start playing it using the default SoundFont.
 Use the following keys to control the program:
@@ -60,6 +60,30 @@ Use the following keys to control the program:
 
 `q` : Quit the program.
 
+### Python Version
+<img src="https://github.com/user-attachments/assets/ab5af1a0-a722-4707-826d-a28347b0b9f5" width="700" height="350">
+
+The Python version provides a graphical interface for testing MIDI files with SoundFonts. To run the Python version, use the following command:
+
+```
+python3 soundfontTest.py
+```
+
+Ensure that the following dependencies are installed:
+
+```
+Python 3
+PyGObject (to provide GTK support)
+fluidsynth, timidity, lame, midicsv, shuf, and other system tools as required in the Bash version)
+```
+
+Key Features of the Python Version:
+
+- Graphical User Interface (GUI) : The Python version provides a GTK-based GUI for selecting and playing MIDI files.
+- SoundFont and Track Switching : Switch between SoundFonts and MIDI tracks using the GUI controls.
+- Dark Mode and Shuffle : Options to enable dark mode and shuffle mode for MIDI tracks.
+![Screenshot 2024-11-13 18 15 52]()
+
 ## Additional
 The program will also convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. All temporary folders are deleted on exit.
 
@@ -69,5 +93,5 @@ Format and content of metadata output results will vary depending on the tags pr
 ## License
 
 This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
+it under the terms of the GNU General Public License v3.0 as published by
 the Free Software Foundation.

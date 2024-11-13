@@ -82,7 +82,6 @@ Key Features of the Python Version:
 - Graphical User Interface (GUI) : The Python version provides a GTK-based GUI for selecting and playing MIDI files.
 - SoundFont and Track Switching : Switch between SoundFonts and MIDI tracks using the GUI controls.
 - Dark Mode and Shuffle : Options to enable dark mode and shuffle mode for MIDI tracks.
-![Screenshot 2024-11-13 18 15 52]()
 
 ## Additional
 The program will also convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. All temporary folders are deleted on exit.

@@ -61,7 +61,7 @@ Use the following keys to control the program:
 `q` : Quit the program.
 
 ### Python Version
-<img src="https://github.com/user-attachments/assets/ab5af1a0-a722-4707-826d-a28347b0b9f5" width="700" height="350">
+<img src="https://github.com/user-attachments/assets/cb717971-1dee-44bf-8693-141395ddfb31" width="700" height="350">
 
 The Python version provides a graphical interface for testing MIDI files with SoundFonts, and also supports mod files . To run the Python version, use the following command:
 

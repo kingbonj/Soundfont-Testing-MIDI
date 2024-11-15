@@ -63,7 +63,7 @@ Use the following keys to control the program:
 ### Python Version
 <img src="https://github.com/user-attachments/assets/ab5af1a0-a722-4707-826d-a28347b0b9f5" width="700" height="350">
 
-The Python version provides a graphical interface for testing MIDI files with SoundFonts. To run the Python version, use the following command:
+The Python version provides a graphical interface for testing MIDI files with SoundFonts, and also supports mod files . To run the Python version, use the following command:
 
 ```
 python3 soundfontTest.py
@@ -79,17 +79,25 @@ libglib2.0-dev
 libasound2-dev
 libjack-dev
 libpulse-dev
+openmpt123
+xmp
 fluidsynth, timidity, lame, midicsv, shuf, and other system tools as required in the Bash version)
 ```
 
 Key Features of the Python Version:
 
-- Graphical User Interface (GUI) : The Python version provides a GTK-based GUI for selecting and playing MIDI files.
+- Graphical User Interface (GUI) : The Python version provides a GTK-based GUI for selecting and playing MIDI and MOD packed files.
 - SoundFont and Track Switching : Switch between SoundFonts and MIDI tracks using the GUI controls.
 - Dark Mode and Shuffle : Options to enable dark mode and shuffle mode for MIDI tracks.
 
 ## Additional
 The program will also convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. All temporary folders are deleted on exit.
+
+## Supported Filetypes
+
+```
+.mid, .midi, .mod, .xm, .it, .s3m, .stm, .imf, .ptm, .mdl, .ult, .liq, .masi, .j2b, .amf, .med, .rts, .digi, .sym, .dbm, .qc, .okt, .sfx, .far, .umx, .hmn, .slt, .coco, .ims, .669, .abk, .uni, .gmc
+```
 
 ## Bugs/Other
 Format and content of metadata output results will vary depending on the tags provided, unfortunately there is nothing that can be done to elimenate instruments with uncommon or custom names. Please report any other unexpected bugs!

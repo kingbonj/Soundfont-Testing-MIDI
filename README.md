@@ -83,6 +83,7 @@ openmpt123
 xmp
 fluidsynth, timidity, lame, midicsv, shuf, and other system tools as required in the Bash version)
 ```
+Place `soundfontpy.png` in the root folder. 
 
 Key Features of the Python Version:
 
@@ -95,6 +96,7 @@ The program will also convert the MIDI file to .csv and store them in newly crea
 
 ## Supported Filetypes
 
+The program will scan `~/`, `~/MIDI`, and `~/MOD` for matching filetypes:
 ```
 .mid, .midi, .mod, .xm, .it, .s3m, .stm, .imf, .ptm, .mdl, .ult, .liq, .masi, .j2b, .amf, .med, .rts, .digi, .sym, .dbm, .qc, .okt, .sfx, .far, .umx, .hmn, .slt, .coco, .ims, .669, .abk, .uni, .gmc
 ```

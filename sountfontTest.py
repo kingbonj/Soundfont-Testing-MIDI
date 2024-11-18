@@ -9,6 +9,7 @@ import sys
 import shutil
 import tempfile
 import time
+import requests
 
 try:
     import gi
@@ -47,6 +48,7 @@ class MidiSoundfontTester(Gtk.Window):
             "midicsv",
             "xmp",
             "openmpt123",
+            "mplayer",
         ]
         self.check_requirements()
 
@@ -56,6 +58,16 @@ class MidiSoundfontTester(Gtk.Window):
         self.fluidsynth_process = None
         self.xmp_process = None
         self.shuffle_mode = False
+        self.streams = [
+            {'url': 'http://83.240.65.106:8000/dos', 'title': 'LiquidDOS Classic'},
+            {'url': 'http://83.240.65.106:8000/doom', 'title': 'LiquidDOS Doom'},
+            {'url': 'https://stream.nightride.fm/nightride.m4a', 'title': 'Nightride FM'},
+            # Add more streams as needed
+        ]
+        self.current_stream_index = 0  # Start with the first URL
+        self.radio = False
+        self.stream_title = "Unassigned title"
+        self.mplayer_process = None  # Initialize mplayer_process
         self.xmp_stopped_intentionally = False  # Flag to handle intentional termination
 
         # Build UI
@@ -357,6 +369,10 @@ class MidiSoundfontTester(Gtk.Window):
             button.connect("clicked", callback)
             button.get_style_context().add_class("round-button")
             return button
+            
+        # Radio Button
+        self.radio_button = create_round_button("network-wireless", "LiquidDOS Radio", self.on_radio)
+        controls_box.pack_start(self.radio_button, False, False, 0)
     
         # Previous Button
         self.prev_button = create_round_button("media-skip-backward", "Previous", self.on_previous)
@@ -419,7 +435,148 @@ class MidiSoundfontTester(Gtk.Window):
         # Start the spinner initially to test visibility
         self.spinner.start()
 
-            
+    def on_radio(self, button):
+        if not self.radio:
+            # If radio is not active, start streaming the current URL
+            self.stop_xmp()
+            self.stop_fluidsynth()
+            current_stream = self.streams[self.current_stream_index]
+            self.start_stream(current_stream['url'], current_stream['title'])
+        else:
+            # If radio is active, switch to the next stream
+            self.stop_stream()
+            self.current_stream_index = (self.current_stream_index + 1) % len(self.streams)
+            next_stream = self.streams[self.current_stream_index]
+            self.start_stream(next_stream['url'], next_stream['title'])
+    
+    def start_stream(self, url, title):
+        self.stop_stream()  # Ensure any existing stream is stopped
+        stream_url = url
+        self.spinner.start()
+    
+        if self.mplayer_process is None:
+            try:
+                # Start mplayer as a subprocess
+                self.mplayer_process = subprocess.Popen(
+                    ['mplayer', stream_url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                self.status_label.set_text(f"Connecting to {stream_url}...")
+                print(f"Streaming {stream_url}...")
+    
+                # Set the radio flag to True before starting the thread
+                self.radio = True
+    
+                # Start the thread to fetch current track
+                self.track_thread = threading.Thread(
+                    target=self.fetch_current_track,
+                    args=(stream_url,),
+                    daemon=True
+                )
+                self.track_thread.start()
+    
+                # Manually set the stream title
+                self.stream_title = title
+                self.status_label.set_tooltip_text(f"{self.streams[self.current_stream_index]['title']}")
+                GLib.idle_add(self.update_metadata)  # Update metadata in the main thread
+    
+            except FileNotFoundError:
+                print("mplayer not found. Please install mplayer and try again.")
+                self.radio = False
+                # Update the UI safely
+                GLib.idle_add(self.status_label.set_text, "mplayer not found.")
+            except Exception as e:
+                print(f"Failed to start mplayer: {e}")
+                self.radio = False
+                # Update the UI safely
+                GLib.idle_add(self.status_label.set_text, "Failed to start streaming.")
+        else:
+            print("mplayer is already running.")
+            GLib.idle_add(self.status_label.set_text, "Streaming already in progress.")
+
+    def fetch_current_track(self, url):
+        headers = {
+            'Icy-MetaData': '1',  # Request ICY metadata
+            'User-Agent': 'Python'  # Set a user agent
+        }
+        try:
+            # Initiate a stream with metadata
+            response = requests.get(url, headers=headers, stream=True, timeout=10)
+            if response.status_code == 200:
+                metaint = response.headers.get('icy-metaint')
+                if metaint:
+                    metaint = int(metaint)
+                    while self.radio:
+                        # Read the stream up to the metadata interval
+                        stream_data = response.raw.read(metaint)
+                        if not stream_data:
+                            break  # Stream ended
+    
+                        # Read the metadata length byte
+                        meta_length_byte = response.raw.read(1)
+                        if not meta_length_byte:
+                            break  # Stream ended
+                        meta_length = meta_length_byte[0] * 16  # Metadata length
+    
+                        if meta_length > 0:
+                            # Read the metadata
+                            metadata = response.raw.read(meta_length).rstrip(b'\0')
+                            metadata_str = metadata.decode('utf-8', errors='ignore')
+    
+                            # Extract the StreamTitle
+                            for part in metadata_str.split(';'):
+                                if part.startswith("StreamTitle='"):
+                                    title = part.split("=", 1)[1].strip("'")
+                                    # Update the status_label in the main thread only if radio is active
+                                    if self.radio:
+                                        # If you want to prefer manual titles, you can decide whether to overwrite
+                                        # For this example, we'll overwrite with stream-provided titles if available
+                                        self.stream_title = title if title else self.stream_title
+                                        GLib.idle_add(self.status_label.set_text, f"Now Streaming: {self.stream_title}")
+                                        print(f"Now Playing: {self.stream_title}") 
+                                        GLib.idle_add(self.update_metadata)
+                        time.sleep(1)  # Wait before the next update
+                else:
+                    # No metadata interval provided
+                    if self.radio:
+                        GLib.idle_add(self.status_label.set_text, "Streaming without metadata.")
+                        print("Streaming without metadata.")
+        except Exception as e:
+            print(f"Error fetching track info: {e}")
+            if self.radio:
+                # Update the UI safely only if radio is active
+                GLib.idle_add(self.status_label.set_text, "Streaming Radio...")
+
+    def stop_stream(self):
+        self.spinner.stop()
+        self.radio = False
+        if self.mplayer_process:
+            try:
+                # Terminate the mplayer process
+                self.mplayer_process.terminate()
+                self.mplayer_process.wait(timeout=1)
+
+            except subprocess.TimeoutExpired:
+                print("mplayer did not terminate in time; killing it.")
+                self.mplayer_process.kill()
+                GLib.idle_add(self.status_label.set_text, "Radio stopped forcefully.")
+            except Exception as e:
+                print(f"Error stopping mplayer: {e}")
+                GLib.idle_add(self.status_label.set_text, "Error stopping radio.")
+            finally:
+                self.mplayer_process = None
+        else:
+            print("mplayer is not running.")
+        
+        # Wait for the track_thread to finish
+        if hasattr(self, 'track_thread') and self.track_thread.is_alive():
+            self.track_thread.join(timeout=1)
+
+    def on_destroy(self, widget):
+        self.stop_stream()
+        Gtk.main_quit()
+
     def start_spinner(self):
         """Method to start the spinner."""
         self.spinner.start()
@@ -677,88 +834,108 @@ class MidiSoundfontTester(Gtk.Window):
             buffer.set_text(metadata)
 
     def extract_metadata(self, file_path):
-        self.spinner.start()
-        try:
-            # File details
-            filename = os.path.basename(file_path)
-            path = os.path.abspath(file_path)
-            filesize = os.path.getsize(file_path)  # File size in bytes
+        if not self.radio:
+            try:
+                # File details
+                filename = os.path.basename(file_path)
+                path = os.path.abspath(file_path)
+                filesize = os.path.getsize(file_path)  # File size in bytes
     
-            # Convert filesize to KB or MB for readability
-            if filesize > 1024 * 1024:
-                filesize_str = f"{filesize / (1024 * 1024):.2f} MB"
-            else:
-                filesize_str = f"{filesize / 1024:.2f} KB"
-    
-            extension = os.path.splitext(file_path)[1].lower()
-            metadata_lines = []
-    
-            if extension in ['.mid', '.midi']:
-                # Extract MIDI-specific metadata using midicsv
-                with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_csv:
-                    temp_csv_name = temp_csv.name
-                subprocess.run(["midicsv", file_path, temp_csv_name], check=True)
-    
-                with open(temp_csv_name, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read()
-    
-                os.remove(temp_csv_name)
-                lines = content.splitlines()
-    
-                # Extract lines that contain metadata tags and remove the first three columns
-                for line in lines:
-                    if any(tag in line for tag in ["Title_t", "Text_t", "Copyright_t", "Composer", "Album", "Title", "Track_name", "Lyrics", "Metaeventtext", "Marker"]):
-                        columns = line.split(',', 3)
-                        if len(columns) > 3:
-                            metadata_lines.append(columns[3].strip())
-    
-            elif extension in [
-                '.mod', '.xm', '.it', '.s3m', '.stm', '.imf', '.ptm', '.mdl', '.ult',
-                '.liq', '.masi', '.j2b', '.amf', '.med', '.rts', '.digi', '.sym',
-                '.dbm', '.qc', '.okt', '.sfx', '.far', '.umx', '.hmn', '.slt',
-                '.coco', '.ims', '.669', '.abk', '.uni', '.gmc'
-            ]:
-                # Extract MOD file metadata using openmpt123
-                openmpt_result = subprocess.run(['openmpt123', '--info', file_path], capture_output=True, text=True)
-                if openmpt_result.returncode == 0:
-                    # Filter out the header lines from openmpt123 output
-                    filtered_lines = []
-                    header_end_reached = False
-                    for line in openmpt_result.stdout.splitlines():
-                        if header_end_reached:
-                            filtered_lines.append(line)
-                        elif line.startswith("Type"):  # Detect start of relevant metadata
-                            header_end_reached = True
-                            filtered_lines.append(line)
-                    
-                    metadata_lines.extend(filtered_lines)
+                # Convert filesize to KB or MB for readability
+                if filesize > 1024 * 1024:
+                    filesize_str = f"{filesize / (1024 * 1024):.2f} MB"
                 else:
-                    metadata_lines.append("No metadata available for this MOD file.")
+                    filesize_str = f"{filesize / 1024:.2f} KB"
     
-            else:
-                metadata_lines.append("Unknown file type.")
+                extension = os.path.splitext(file_path)[1].lower()
+                metadata_lines = []
     
-            # Combine file details with extracted metadata
+                if extension in ['.mid', '.midi']:
+                    # Extract MIDI-specific metadata using midicsv
+                    with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_csv:
+                        temp_csv_name = temp_csv.name
+                    subprocess.run(["midicsv", file_path, temp_csv_name], check=True)
+    
+                    with open(temp_csv_name, 'r', encoding='utf-8', errors='replace') as f:
+                        content = f.read()
+    
+                    os.remove(temp_csv_name)
+                    lines = content.splitlines()
+    
+                    # Extract lines that contain metadata tags and remove the first three columns
+                    for line in lines:
+                        if any(tag in line for tag in ["Title_t", "Text_t", "Copyright_t", "Composer", "Album", "Title", "Track_name", "Lyrics", "Metaeventtext", "Marker"]):
+                            columns = line.split(',', 3)
+                            if len(columns) > 3:
+                                metadata_lines.append(columns[3].strip())
+    
+                elif extension in [
+                    '.mod', '.xm', '.it', '.s3m', '.stm', '.imf', '.ptm', '.mdl', '.ult',
+                    '.liq', '.masi', '.j2b', '.amf', '.med', '.rts', '.digi', '.sym',
+                    '.dbm', '.qc', '.okt', '.sfx', '.far', '.umx', '.hmn', '.slt',
+                    '.coco', '.ims', '.669', '.abk', '.uni', '.gmc'
+                ]:
+                    # Extract MOD file metadata using openmpt123
+                    openmpt_result = subprocess.run(['openmpt123', '--info', file_path], capture_output=True, text=True)
+                    if openmpt_result.returncode == 0:
+                        # Filter out the header lines from openmpt123 output
+                        filtered_lines = []
+                        header_end_reached = False
+                        for line in openmpt_result.stdout.splitlines():
+                            if header_end_reached:
+                                filtered_lines.append(line)
+                            elif line.startswith("Type"):  # Detect start of relevant metadata
+                                header_end_reached = True
+                                filtered_lines.append(line)
+                        
+                        metadata_lines.extend(filtered_lines)
+                    else:
+                        metadata_lines.append("No metadata available for this MOD file.")
+    
+                else:
+                    metadata_lines.append("Unknown file type.")
+
+                # Extract the containing directory from the file path
+                containing_directory = os.path.dirname(path)
+                info_txt_path = os.path.join(containing_directory, "info.txt")
+                info_txt = ""
+                
+                # Check if info.txt exists in the containing directory
+                if os.path.isfile(info_txt_path):
+                    with open(info_txt_path, "r") as f:
+                        info_txt = f.read()  # Read the contents of info.txt
+    
+                # Combine file details with extracted metadata
+                metadata = (
+                    f"Filename: {filename}\n"
+                    f"Path: {path}\n"
+                    f"File Size: {filesize_str}\n"
+                    + (f"Info.txt: {info_txt}\n" if info_txt else "")
+                    + "\n*** Metadata info ***\n" + "\n".join(metadata_lines)
+                )
+    
+                if not metadata_lines:  # If no metadata found, add a placeholder
+                    metadata += "\n\n**NO METADATA AVAILABLE FOR THIS FILE**"
+    
+                return metadata
+    
+            except Exception as e:
+                return f"Error extracting metadata: {e}"
+        else:
             metadata = (
-                f"Filename: {filename}\n"
-                f"Path: {path}\n"
-                f"File Size: {filesize_str}\n"
-                f"\n" + "\n".join(metadata_lines)
+                f"Track Name: {self.stream_title}\n"
+                f"Title: {self.streams[self.current_stream_index]['title']}\n"
+                f"URL: {self.streams[self.current_stream_index]['url']}\n"
+                f"Genre: Game\n"
             )
-    
-            if not metadata_lines:  # If no metadata found, add a placeholder
-                metadata += "\n\n**NO METADATA AVAILABLE FOR THIS FILE**"
-    
+                
             return metadata
     
-        except Exception as e:
-            return f"Error extracting metadata: {e}"
-            self.spinner.stop()
-
     def on_play(self, button):
         self.spinner.start()
         self.stop_fluidsynth()
         self.stop_xmp()
+        self.stop_stream()
         file_path = self.get_selected_file()
         if file_path:
             extension = os.path.splitext(file_path)[1].lower()
@@ -768,7 +945,7 @@ class MidiSoundfontTester(Gtk.Window):
                 if sf2_file:
                     try:
                         self.fluidsynth_process = subprocess.Popen(
-                            ["fluidsynth", "-a", "pulseaudio", "-m", "alsa_seq", "-i", sf2_file, file_path],
+                            ["fluidsynth", "-g", "1.3", "-a", "pulseaudio", "-m", "alsa_seq", "-i", sf2_file, file_path],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
@@ -884,10 +1061,12 @@ class MidiSoundfontTester(Gtk.Window):
         self.spinner.stop()
         self.stop_fluidsynth()
         self.stop_xmp()
+        self.stop_stream()
         self.status_label.set_text("Playback Stopped")
         self.status_label.set_tooltip_text("")
 
     def on_previous(self, button):
+        self.stop_stream()
         self.stop_fluidsynth()
         self.stop_xmp()
 
@@ -918,9 +1097,10 @@ class MidiSoundfontTester(Gtk.Window):
         self.on_play(None)
 
     def on_next(self, button):
+        self.stop_stream()
         self.stop_fluidsynth()
         self.stop_xmp()
-
+        
         selection = self.all_treeview.get_selection()
         model, treeiter = selection.get_selected()
 
@@ -1281,6 +1461,7 @@ class MidiSoundfontTester(Gtk.Window):
         print("Quitting application...")
         self.stop_fluidsynth()
         self.stop_xmp()
+        self.stop_stream()  # Ensure mplayer is terminated
         Gtk.main_quit()
 
     def file_filter_func(self, model, iter, data):

@@ -10,6 +10,22 @@ import shutil
 import tempfile
 import time
 import requests
+import re
+import webbrowser
+import gi
+from PIL import Image, ImageDraw
+import base64
+import traceback
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
+gi.require_version('Gtk', '3.0')
+gi.require_version('GdkPixbuf', '2.0')  # Specify the GdkPixbuf version
+from gi.repository import Gtk, Gdk, Pango, GLib, GObject, GdkPixbuf
 
 try:
     import gi
@@ -19,18 +35,74 @@ except ImportError:
     print("Error importing GTK modules. Ensure PyGObject is installed.")
     sys.exit(1)
 
-
 def sigint_handler(signal_received, frame):
     print("Call to Quit received. Exiting...")
     Gtk.main_quit()
     
 signal.signal(signal.SIGINT, sigint_handler)
 
+class ImageScraper:
+    def __init__(self, webdriver_path, search_key="default", output_path=".", headless=True):
+        self.driver = self._init_driver(webdriver_path, headless)
+        self.search_key = search_key
+        self.output_path = output_path
+
+    @staticmethod
+    def _init_driver(webdriver_path, headless):
+        options = Options()
+        if headless:
+            options.add_argument("--headless")
+        service = Service(webdriver_path)
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.set_window_size(800, 600)
+        print("Initialising webdriver...")
+        return driver
+
+    def find_image_url(self):
+        search_url = f"https://www.google.com/search?q=%22{self.search_key}%22+retro+videogame+cover&source=lnms&tbm=isch"
+        self.driver.get(search_url)
+        print(f"Searching for {self.search_key} image...")
+
+        try:
+            WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "H8Rx8c"))
+            )
+            div_container = self.driver.find_element(By.CLASS_NAME, "H8Rx8c")
+            target_image = div_container.find_element(By.TAG_NAME, "img")
+            img_src = target_image.get_attribute("src")
+            return img_src
+        except (TimeoutException, NoSuchElementException):
+            print("Image search timed out!")
+            return None
+
+    def save_image(self, img_url):
+        output_filepath = os.path.join(self.output_path, "image.jpg")
+        if img_url.startswith("data:image"):  # Handle base64-encoded image
+            header, encoded = img_url.split(",", 1)
+            data = base64.b64decode(encoded)
+            with open(output_filepath, "wb") as f:
+                f.write(data)
+            print("Image found!")
+            print(f"Image saved to {output_filepath}")
+        else:  # Handle normal image URL
+            response = requests.get(img_url, stream=True, timeout=5)
+            if response.status_code == 200:
+                with Image.open(io.BytesIO(response.content)) as img:
+                    img.save(output_filepath)
+                    print(f"Image saved to {output_filepath}")
+
+    def process_directory(self):
+        image_url = self.find_image_url()
+        if image_url:
+            self.save_image(image_url)
+
 class MidiSoundfontTester(Gtk.Window):
     def __init__(self):
         super().__init__(title="MIDI SoundFont Testing Program v0.1.4")
         self.set_default_size(1200, 600)
         self.set_border_width(5)
+
+        Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", True)
 
         self.set_icon_name("multimedia-player")
         
@@ -61,7 +133,7 @@ class MidiSoundfontTester(Gtk.Window):
         self.streams = [
             {'url': 'http://83.240.65.106:8000/dos', 'title': 'LiquidDOS Classic'},
             {'url': 'http://83.240.65.106:8000/doom', 'title': 'LiquidDOS Doom'},
-            {'url': 'https://stream.nightride.fm/nightride.m4a', 'title': 'Nightride FM'},
+            {'url': 'https://relay.rainwave.cc/chiptune.mp3', 'title': 'Rainwave Chiptune'},
             # Add more streams as needed
         ]
         self.current_stream_index = 0  # Start with the first URL
@@ -69,17 +141,21 @@ class MidiSoundfontTester(Gtk.Window):
         self.stream_title = "Unassigned title"
         self.mplayer_process = None  # Initialize mplayer_process
         self.xmp_stopped_intentionally = False  # Flag to handle intentional termination
+        self.online_services = False  # Default: disabled
+        self.image_viewer = True
+        self.current_pixbuf = None  # Initialise as None
+        self.meta_extract = True
+        self.image_viewer = True
 
         # Build UI
         self.build_ui()
+        print("Building UI...")
 
         # Load initial data
-        self.spinner.start()
         self.load_all_files()
         self.load_sf2_files()
         self.update_metadata()
-        self.spinner.stop()
-
+        GLib.idle_add(self.update_image_pane)
         # Handle close event
         self.connect("destroy", self.on_quit)
 
@@ -120,96 +196,127 @@ class MidiSoundfontTester(Gtk.Window):
 
         # Create media controls
         self.create_media_controls(grid)
-        self.all_treeview.set_has_tooltip(True)
-        self.all_treeview.connect("query-tooltip", self.on_file_query_tooltip)
+        self.create_context_menu()
+        self.apply_monospace_font(self.context_menu)
 
     def create_menu_bar(self, grid):
+        # Create the menu bar
         menu_bar = Gtk.MenuBar()
         menu_bar.connect("realize", lambda widget: self.apply_monospace_font(widget))
-
-        # File Menu
+    
+        # Create the File Menu
         file_menu = Gtk.Menu()
         file_item = Gtk.MenuItem(label="File")
-        file_item.set_submenu(file_menu)
-
+        file_item.set_submenu(file_menu)  # Associate the File menu with the File item
+    
         select_source_item = Gtk.MenuItem(label="📂 Select Source Directory...")
         select_source_item.connect("activate", self.on_select_source_directory)
         file_menu.append(select_source_item)
-
+    
         select_sf2_item = Gtk.MenuItem(label="📂 Select SoundFont Directory...")
         select_sf2_item.connect("activate", self.on_select_sf2_source)
         file_menu.append(select_sf2_item)
-
+    
         quit_item = Gtk.MenuItem(label="❌ Quit")
         quit_item.connect("activate", self.on_quit)
         file_menu.append(quit_item)
-
-        # Settings Menu
+    
+        # Create the Settings Menu
         settings_menu = Gtk.Menu()
         settings_item = Gtk.MenuItem(label="Settings")
-        settings_item.set_submenu(settings_menu)
-
+        settings_item.set_submenu(settings_menu)  # Associate the Settings menu with the Settings item
+    
         shuffle_mode_item = Gtk.CheckMenuItem(label="🔀 Shuffle Mode")
         shuffle_mode_item.set_active(self.shuffle_mode)
         shuffle_mode_item.connect("toggled", self.on_shuffle_mode_toggled)
         settings_menu.append(shuffle_mode_item)
+    
+        # Create Online Services menu item
+        self.online_services_menuitem = Gtk.CheckMenuItem(label="🌐 Scrape Images")
+        self.online_services_menuitem.set_active(self.online_services)
+        self.online_services_menuitem.connect("toggled", self.on_online_services_toggled)
+        settings_menu.append(self.online_services_menuitem)
 
-        # Dark Mode checkbox in the Settings menu
+        # Create Metadata Extractor menu item
+        self.meta_extract_menuitem = Gtk.CheckMenuItem(label="🏷️ Embedded Metadata")
+        self.meta_extract_menuitem.set_active(self.meta_extract)
+        self.meta_extract_menuitem.connect("toggled", self.on_meta_extract_toggled)
+        settings_menu.append(self.meta_extract_menuitem)
+    
+        # Create the View Menu
+        view_menu = Gtk.Menu()
+        view_item = Gtk.MenuItem(label="View")
+        view_item.set_submenu(view_menu)  # Associate the Settings menu with the Settings item
+
+         # Create Image Viewer menu item
+        self.image_viewer_menuitem = Gtk.CheckMenuItem(label="🖻 Image Viewer")
+        self.image_viewer_menuitem.set_active(self.image_viewer)
+        self.image_viewer_menuitem.connect("toggled", self.on_image_viewer_toggled)
+        view_menu.append(self.image_viewer_menuitem)
+
+        # Create Dark Mode menu item
         dark_mode_item = Gtk.CheckMenuItem(label="🌗 Dark Mode")
         dark_mode_item.set_active(
             Gtk.Settings.get_default().get_property("gtk-application-prefer-dark-theme")
         )
         dark_mode_item.connect("toggled", self.on_dark_mode_toggled)
-        settings_menu.append(dark_mode_item)
-
-        # About Menu
+        view_menu.append(dark_mode_item)
+        
+        # Create the About Menu
         about_menu = Gtk.Menu()
         about_item = Gtk.MenuItem(label="About")
-        about_item.set_submenu(about_menu)
-
+        about_item.set_submenu(about_menu)  # Associate the About menu with the About item
+    
         licence_item = Gtk.MenuItem(label="🐧 Licence")
         licence_item.connect("activate", self.on_licence)
         about_menu.append(licence_item)
-
-        # Append menus to the menu bar
+    
+        # Add items to the menu bar
         menu_bar.append(file_item)
         menu_bar.append(settings_item)
+        menu_bar.append(view_item)
         menu_bar.append(about_item)
-
-        self.apply_monospace_font(menu_bar)
-
+    
+        # Apply monospace font to the menu bar
+    
         # Attach the menu bar to the grid
         grid.attach(menu_bar, 0, 0, 1, 1)
+    
+        # Show the menu bar and its items
+        menu_bar.show_all()
 
     def create_panes(self, grid):
+        # Define absolute variables for image pane size
+        self.image_pane_width = 300  # Fixed width for the image pane
+        
         hpaned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         hpaned.set_hexpand(True)
         hpaned.set_vexpand(True)
         grid.attach(hpaned, 0, 1, 1, 1)
-
-        # Left Pane: Files List (All Files)
+        
+        # Left Pane: Files List
         left_pane_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-
-        # Add Search Entry
+        
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.set_placeholder_text("Filter files...")
         self.search_entry.connect("search-changed", self.on_search_changed)
         self.apply_monospace_font(self.search_entry)
         left_pane_box.pack_start(self.search_entry, False, False, 0)
-
-        # File TreeView
-        self.all_store = Gtk.ListStore(object, object, object)  # (filename, foldername, filepath)
+        
+        self.all_store = Gtk.ListStore(object, object, object)
         self.all_filter = self.all_store.filter_new()
         self.all_filter.set_visible_func(self.file_filter_func)
         self.all_treeview = Gtk.TreeView(model=self.all_filter)
-
-        # Custom CellRenderer for Filename
+        self.all_treeview.connect("button-press-event", self.on_treeview_button_press)
+        self.all_treeview.set_has_tooltip(True)
+        self.all_treeview.connect("query-tooltip", self.on_file_query_tooltip)
+        
         renderer = Gtk.CellRendererText()
         column = Gtk.TreeViewColumn("Files")
         column.pack_start(renderer, True)
         column.set_cell_data_func(renderer, self.render_filename)
         self.all_treeview.append_column(column)
-
+        
         self.apply_monospace_font(self.all_treeview)
         self.all_treeview.connect("row-activated", self.on_file_selected)
         scrolled_window_files = Gtk.ScrolledWindow()
@@ -217,17 +324,27 @@ class MidiSoundfontTester(Gtk.Window):
         scrolled_window_files.set_vexpand(True)
         scrolled_window_files.add(self.all_treeview)
         
-        # Pack the TreeView into the left pane box
         left_pane_box.pack_start(scrolled_window_files, True, True, 0)
         hpaned.add1(left_pane_box)
-
-        # Middle and Right Panes
+        hpaned.set_position(300)
+        
         vpaned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
         vpaned.set_hexpand(True)
         vpaned.set_vexpand(True)
+        vpaned.connect("size-allocate", self.on_resize_upper_pane)
+        vpaned.set_hexpand(True)
+        vpaned.set_vexpand(True)
         hpaned.add2(vpaned)
-
-        # Right Upper Pane: SoundFonts
+        
+        # Upper Right Pane: SF2 and Image
+        upper_hpaned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        upper_hpaned.set_hexpand(True)
+        upper_hpaned.set_vexpand(True)
+        upper_hpaned.set_size_request(-1, 280)  # Set minimum height
+        vpaned.add1(upper_hpaned)
+        vpaned.connect("size-allocate", self.on_resize_set_upper_pane_height)
+        
+        # SoundFonts Pane
         self.sf2_store = Gtk.ListStore(str)
         self.sf2_treeview = Gtk.TreeView(model=self.sf2_store)
         renderer_sf2 = Gtk.CellRendererText()
@@ -238,42 +355,159 @@ class MidiSoundfontTester(Gtk.Window):
         scrolled_window_sf2 = Gtk.ScrolledWindow()
         scrolled_window_sf2.set_hexpand(True)
         scrolled_window_sf2.set_vexpand(True)
-        self.sf2_treeview.set_margin_top(35)
         scrolled_window_sf2.add(self.sf2_treeview)
-
-        # Right Lower Pane: Metadata
-        metadata_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        upper_hpaned.set_margin_top(35)  # Add the margin here
+        upper_hpaned.add1(scrolled_window_sf2)
         
-        # Create a dummy TreeView to act as the header
+        # Image Pane
+        image_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        
+        treeview_header = Gtk.TreeView()
+        treeview_header.set_headers_visible(True)
+        treeview_header.set_model(Gtk.ListStore(str))
+        header_renderer = Gtk.CellRendererText()
+        header_column = Gtk.TreeViewColumn("Image Viewer")
+        header_column.pack_start(header_renderer, True)
+        treeview_header.append_column(header_column)
+
+        image_vbox.pack_start(treeview_header, False, False, 0)
+        
+        # Encapsulate image viewer components into a container
+        self.image_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.image_box.set_hexpand(False)
+        self.image_box.set_vexpand(False)
+        
+        # Dummy header
+        treeview_header = Gtk.TreeView()
+        treeview_header.set_headers_visible(True)
+        treeview_header.set_model(Gtk.ListStore(str))
+        header_renderer = Gtk.CellRendererText()
+        header_column = Gtk.TreeViewColumn("Image Viewer")
+        header_column.pack_start(header_renderer, True)
+        treeview_header.append_column(header_column)
+        self.image_box.pack_start(treeview_header, False, False, 0)
+        
+        # Image Pane
+        self.image_pane = Gtk.Image()
+        self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
+        self.image_pane.set_hexpand(False)
+        self.image_pane.set_vexpand(False)
+        self.image_pane.set_size_request(280, 220)
+        scrolled_window_image = Gtk.ScrolledWindow()
+        scrolled_window_image.set_hexpand(False)
+        scrolled_window_image.set_vexpand(False)
+        scrolled_window_image.set_size_request(300, 220)
+        scrolled_window_image.add(self.image_pane)
+        self.image_box.pack_start(scrolled_window_image, True, True, 0)
+        
+        # Add image_box to the upper pane
+        upper_hpaned.add2(self.image_box)
+    
+        # Dynamically set SF2 pane width
+        upper_hpaned.set_size_request(280, 220)  # Fixed width and height
+        upper_hpaned.connect("size-allocate", self.on_resize_set_sf2_pane_width)
+
+        # Metadata Pane
+        metadata_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         metadata_header = Gtk.TreeView()
         renderer_metadata = Gtk.CellRendererText()
         column_metadata = Gtk.TreeViewColumn("Metadata", renderer_metadata, text=0)
-        
         metadata_header.append_column(column_metadata)
         self.apply_monospace_font(metadata_header)
         metadata_header.set_headers_visible(True)
-        metadata_header.set_model(Gtk.ListStore(str))  # Empty model to display header only
+        metadata_header.set_model(Gtk.ListStore(str))
         metadata_box.pack_start(metadata_header, False, False, 0)
         
-        # Add the actual metadata text view below the header
         self.metadata_view = Gtk.TextView()
         self.metadata_view.set_editable(False)
-        self.metadata_view.set_wrap_mode(Pango.WrapMode.WORD)  # Enable word wrapping
+        self.metadata_view.set_cursor_visible(False)
+        self.metadata_view.set_wrap_mode(Pango.WrapMode.WORD)
         self.apply_monospace_font(self.metadata_view)
         scrolled_window_metadata = Gtk.ScrolledWindow()
-        scrolled_window_metadata.set_hexpand(True)
-        scrolled_window_metadata.set_vexpand(True)
+        scrolled_window_metadata.set_hexpand(False)
+        scrolled_window_metadata.set_vexpand(False)
         scrolled_window_metadata.add(self.metadata_view)
         metadata_box.pack_start(scrolled_window_metadata, True, True, 0)
+        
         vpaned.add2(metadata_box)
 
-        # Add the panes
-        vpaned.add1(scrolled_window_sf2)
-        vpaned.add2(metadata_box)
-        # Connect signals to adjust pane positions
-        hpaned.connect('size-allocate', self.on_hpaned_size_allocate)
-        vpaned.connect('size-allocate', self.on_vpaned_size_allocate)
+    def on_resize_upper_pane(self, widget, allocation):
+        total_height = allocation.height
+        current_position = widget.get_position()
+    
+        # Ensure the upper pane maintains its minimum height
+        if current_position < 200:
+            widget.set_position(200)
+        elif current_position > total_height - 200:
+            # Ensure the lower pane has enough space
+            widget.set_position(200)
+        
+    def on_resize_set_sf2_pane_width(self, widget, allocation):
+        total_width = allocation.width  # Get the total width of the parent container
+        sf2_pane_width = max(total_width - self.image_pane_width, 0)  # Ensure non-negative width
+        widget.set_position(sf2_pane_width)  # Dynamically adjust the SF2 pane's width
 
+    def on_resize_set_image_pane_width(self, widget, allocation):
+        widget.set_position(300)  # Set the image pane to a fixed width
+        upper_hpaned.connect("size-allocate", self.on_resize_set_image_pane_width)
+
+    def on_resize_set_upper_pane_height(self, widget, allocation):
+        min_height = 280  # Minimum height for upper panes
+        current_position = widget.get_position()
+    
+        # If the current position is smaller than the minimum, set it back to min_height
+        if current_position < min_height:
+            widget.set_position(min_height)
+
+    def update_image_pane(self):
+        file_path = self.get_selected_file()
+    
+        if file_path:
+            folder_path = os.path.dirname(file_path)
+            image_path = os.path.join(folder_path, "image.jpg")
+    
+            # Check if the local image file exists
+            if os.path.isfile(image_path):
+                self.scale_image_to_fit(image_path)
+            elif self.online_services:  # If online services are enabled
+                search_key = os.path.basename(folder_path)
+                webdriver_path = "/usr/bin/chromedriver"  # Adjust this path as necessary
+    
+                try:
+                    scraper = ImageScraper(webdriver_path, search_key=search_key, output_path=folder_path, headless=True)
+                    scraper.process_directory()
+                    # Retry loading the image after scraping
+                    if os.path.isfile(image_path):
+                        self.scale_image_to_fit(image_path)
+                    else:
+                        self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
+                        self.image_pane.set_tooltip_text("Image missing")
+                except Exception as e:
+                    print(f"[ERROR] Failed to fetch and save image: {e}")
+                    traceback.print_exc()
+                    self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
+                    self.image_pane.set_tooltip_text("[ERROR] Failed to fetch and save image")
+            else:
+                # Fallback to a default image
+                self.scale_image_to_fit("image.jpg")
+                self.image_pane.set_tooltip_text("Fallback Image")
+        else:
+            # On launch or when no file is selected
+            self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
+            self.image_pane.set_tooltip_text("Image missing")
+
+    def scale_image_to_fit(self, image_path):
+        try:
+            # Load the image from the file
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file(image_path)
+            scaled_pixbuf = pixbuf.scale_simple(300, 220, GdkPixbuf.InterpType.BILINEAR)
+            self.image_pane.set_from_pixbuf(scaled_pixbuf)
+            self.image_pane.set_tooltip_text(f"{image_path}")
+        except Exception as e:
+            print(f"Error scaling image: {e}")
+            self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
+            self.image_pane.set_tooltip_text("Error scaling image")
+    
     def render_filename(self, column, cell, model, treeiter, data):
         # Get the filename from the model
         filename = model[treeiter][0]
@@ -435,6 +669,197 @@ class MidiSoundfontTester(Gtk.Window):
         # Start the spinner initially to test visibility
         self.spinner.start()
 
+    def on_button_press(self, widget, event):
+        if event.button == Gdk.BUTTON_PRIMARY:  # Left mouse button
+            buffer = self.metadata_view.get_buffer()
+            x, y = self.metadata_view.window_to_buffer_coords(Gtk.TextWindowType.TEXT, int(event.x), int(event.y))
+            found_iter, text_iter = self.metadata_view.get_iter_at_location(x, y)
+    
+            if found_iter:
+                tag_table = buffer.get_tag_table()
+                link_tag = tag_table.lookup("link")
+                if link_tag and link_tag in text_iter.get_tags():
+                    # Extract the link from the iter range
+                    start = text_iter.copy()
+                    end = text_iter.copy()
+                    start.backward_to_tag_toggle(link_tag)
+                    end.forward_to_tag_toggle(link_tag)
+    
+                    # Get the text within the tag
+                    link_text = buffer.get_text(start, end, include_hidden_chars=False).strip()
+    
+                    # Handle mailto links
+                    if re.match(r'^[\w\.-]+@[\w\.-]+$', link_text):  # Plain email address
+                        selected_file = self.get_selected_file()
+                        if selected_file:
+                            filename = os.path.basename(selected_file)
+                            foldername = os.path.basename(os.path.dirname(selected_file))
+                            subject = f"Subject={filename} in {foldername}"
+                            mailto_link = f"mailto:{link_text}?{subject}"
+                        else:
+                            mailto_link = f"mailto:{link_text}"
+                        
+                        webbrowser.open(mailto_link)
+                    elif re.match(r'^mailto:', link_text):  # Email with mailto:
+                        selected_file = self.get_selected_file()
+                        if selected_file:
+                            filename = os.path.basename(selected_file)
+                            foldername = os.path.basename(os.path.dirname(selected_file))
+                            subject = f"Subject={filename} in {foldername}"
+                            mailto_link = f"{link_text}&{subject}"
+                        else:
+                            mailto_link = link_text
+                        
+                        webbrowser.open(mailto_link)
+                    elif re.match(r'^https?://', link_text):  # URL
+                        webbrowser.open(link_text)
+                    else:
+                        print(f"Unhandled link type: {link_text}")
+
+    def on_motion_notify(self, widget, event):
+        buffer = self.metadata_view.get_buffer()
+        x, y = self.metadata_view.window_to_buffer_coords(Gtk.TextWindowType.TEXT, int(event.x), int(event.y))
+    
+        # Ensure the method call returns valid results
+        try:
+            found_iter, text_iter = self.metadata_view.get_iter_at_location(x, y)
+        except Exception as e:
+            text_iter = None
+    
+        if not text_iter or not found_iter:
+            # Reset cursor to default if no iter is found
+            window = self.metadata_view.get_window(Gtk.TextWindowType.TEXT)
+            if window:
+                window.set_cursor(None)
+            return
+    
+        # Check if the iter has the "link" tag
+        tag_table = buffer.get_tag_table()
+        link_tag = tag_table.lookup("link")
+    
+        if link_tag and link_tag in text_iter.get_tags():
+            # Change cursor to pointer
+            window = self.metadata_view.get_window(Gtk.TextWindowType.TEXT)
+            if window:
+                pointer_cursor = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
+                window.set_cursor(pointer_cursor)
+        else:
+            # Reset cursor to default
+            window = self.metadata_view.get_window(Gtk.TextWindowType.TEXT)
+            if window:
+                window.set_cursor(None)
+
+    def create_context_menu(self):
+        """Creates a context menu for the file list."""
+        self.context_menu = Gtk.Menu()
+        
+        # Add a non-interactive menu item at the top to display the file path
+        self.path_display_item = Gtk.MenuItem()
+        label = Gtk.Label()
+        label.set_line_wrap(True)  # Enable word wrapping
+        label.set_max_width_chars(25)  # Limit to 25 characters per line
+        label.set_ellipsize(Pango.EllipsizeMode.NONE)  # Do not truncate with ellipses
+        label.set_name("path_label")  # Add a name for targeted CSS styling
+        
+        # Apply CSS styling to ensure proper coloring
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b"""
+            #path_label {
+                color: #5275ba;  /* Inherit text color for dark mode support */
+                padding: 5px;
+                font-size: 12px;
+                background-color: transparent;  /* Ensure no background conflicts */
+            }
+        """)
+        style_context = label.get_style_context()
+        style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        
+        self.path_display_item.add(label)
+        self.path_display_item.set_sensitive(False)  # Make it non-interactive
+        self.context_menu.append(self.path_display_item)
+        
+        # Add "Open file location" option
+        open_location_item = Gtk.MenuItem(label="Open File Location...")
+        open_location_item.connect("activate", self.on_open_file_location)
+        self.context_menu.append(open_location_item)
+        
+        # Add "Details..." option
+        details_item = Gtk.MenuItem(label="Game Details...")
+        details_item.connect("activate", self.on_details)
+        self.context_menu.append(details_item)
+        
+        self.context_menu.show_all()
+    
+    def update_context_menu_tooltip(self, file_path):
+        """Updates the tooltip at the top of the context menu."""
+        if self.path_display_item:
+            # Get the label from the path display item
+            label = self.path_display_item.get_child()
+            if file_path:
+                label.set_text(file_path)
+            else:
+                label.set_text("No file selected")
+            print(f"Updated context menu tooltip: {file_path}")  # Debugging
+        
+    def on_treeview_button_press(self, treeview, event):
+        """Detects right-click on the file list and shows the context menu."""
+        if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:  # Right-click
+            path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if path_info:
+                path, column, cell_x, cell_y = path_info
+                treeview.set_cursor(path, column, False)  # Select the right-clicked file
+                
+                # Update the tooltip with the full file path
+                file_path = self.get_selected_file()
+                self.update_context_menu_tooltip(file_path)
+                
+                # Show the context menu
+                try:
+                    self.context_menu.popup_at_pointer(event)
+                except Exception as e:
+                    print(f"Popup at pointer failed: {e}")
+                    # Fallback to popup_at_rect if pointer method fails
+                    parent_window = treeview.get_toplevel()
+                    if isinstance(parent_window, Gtk.Window) and parent_window.is_realized():
+                        widget_window = treeview.get_window()
+                        if widget_window:
+                            rect = Gdk.Rectangle(
+                                x=int(event.x_root), y=int(event.y_root), width=1, height=1
+                            )
+                            self.context_menu.popup_at_rect(
+                                widget_window, rect, Gdk.Gravity.NORTH_WEST, event
+                            )
+                return True
+        return False
+    
+    def on_open_file_location(self, menuitem):
+        """Opens the containing folder of the selected file."""
+        file_path = self.get_selected_file()
+        if file_path:
+            folder_path = os.path.dirname(file_path)
+            try:
+                if sys.platform == "win32":
+                    subprocess.run(["explorer", folder_path], check=True)
+                elif sys.platform == "darwin":
+                    subprocess.run(["open", folder_path], check=True)
+                else:
+                    subprocess.run(["xdg-open", folder_path], check=True)
+            except Exception as e:
+                print(f"Error opening file location: {e}")
+    
+    def on_details(self, menuitem):
+        """Performs a Google search using the file and folder name."""
+        file_path = self.get_selected_file()
+        if file_path:
+            filename = os.path.splitext(os.path.basename(file_path))[0]  # Remove extension
+            foldername = os.path.basename(os.path.dirname(file_path))
+            search_term = '+'.join((foldername + ' ' + filename).split())
+            search_url = f"https://www.google.com/search?sca_esv=null&q={search_term}+retro+game&udm=2&dpr=2.0"
+            try:
+                webbrowser.open(search_url)
+            except Exception as e:
+                print(f"Error opening browser: {e}")
+
     def on_radio(self, button):
         if not self.radio:
             # If radio is not active, start streaming the current URL
@@ -555,7 +980,7 @@ class MidiSoundfontTester(Gtk.Window):
             try:
                 # Terminate the mplayer process
                 self.mplayer_process.terminate()
-                self.mplayer_process.wait(timeout=1)
+                # self.mplayer_process.wait(timeout=1)
 
             except subprocess.TimeoutExpired:
                 print("mplayer did not terminate in time; killing it.")
@@ -566,8 +991,6 @@ class MidiSoundfontTester(Gtk.Window):
                 GLib.idle_add(self.status_label.set_text, "Error stopping radio.")
             finally:
                 self.mplayer_process = None
-        else:
-            print("mplayer is not running.")
         
         # Wait for the track_thread to finish
         if hasattr(self, 'track_thread') and self.track_thread.is_alive():
@@ -587,13 +1010,19 @@ class MidiSoundfontTester(Gtk.Window):
         
     def on_dark_mode_toggled(self, menuitem):
         settings = Gtk.Settings.get_default()
-        settings.set_property("gtk-application-prefer-dark-theme", menuitem.get_active())
+        dark_mode_enabled = menuitem.get_active()
+        settings.set_property("gtk-application-prefer-dark-theme", dark_mode_enabled)
+        
+        if dark_mode_enabled:
+            GLib.idle_add(self.status_label.set_text, "Dark Mode Enabled")
+        else:
+            GLib.idle_add(self.status_label.set_text, "Dark Mode Disabled")
 
     def apply_monospace_font(self, widget):
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""
             * {
-                font-family: monospace;
+                font-size: 14px;
             }
         """)
         style_context = widget.get_style_context()
@@ -676,33 +1105,21 @@ class MidiSoundfontTester(Gtk.Window):
         GLib.idle_add(self.spinner.stop)
     
     def _load_files_into_store(self, files):
-        if not files:  # Check if files is None or an empty list
-            self.status_label.set_text(f"Done")
-            return  # Prevent further execution if no files are available
+        if not files:  # Check if files is None or empty
+            self.status_label.set_text(f"No files to load.")
+            return
     
-        for all_file in files:
-            self.append_file_to_store(all_file)
+        # Disable updates to the UI while adding files
+        self.all_store.freeze_notify()
+        try:
+            for all_file in files:
+                self.append_file_to_store(all_file)
+        finally:
+            # Re-enable UI updates
+            self.all_store.thaw_notify()
     
+        # Update status and UI after all files are added
         self.status_label.set_text(f"Loaded {len(files)} files")
-        self.all_filter.refilter()
-        self.update_file_column_title()
-        self.select_current_file_in_treeview()
-        self.update_metadata()
-        
-    def prepare_shuffled_files(self):
-        # Perform the shuffling and loading in the background
-        shuffled_files = self.all_files.copy()
-        random.shuffle(shuffled_files)
-        
-        # After preparing the list, update the GUI in one operation
-        GLib.idle_add(self.update_ui_with_shuffled_files, shuffled_files)
-    
-    def update_ui_with_shuffled_files(self, shuffled_files):
-        for all_file in shuffled_files:
-            self.append_file_to_store(all_file)
-        
-        # Update the status label once the shuffle is complete
-        self.status_label.set_text("Shuffle complete")
         self.all_filter.refilter()
         self.update_file_column_title()
         self.select_current_file_in_treeview()
@@ -720,7 +1137,6 @@ class MidiSoundfontTester(Gtk.Window):
             basename = os.path.basename(sf2_file)
             self.sf2_store.append([basename])
 
-        # Enable tooltips and connect query-tooltip signal
         self.sf2_treeview.set_has_tooltip(True)
         self.sf2_treeview.connect("query-tooltip", self.on_sf2_query_tooltip)
         if self.sf2_store.get_iter_first():
@@ -737,18 +1153,23 @@ class MidiSoundfontTester(Gtk.Window):
                 tooltip.set_text(file_path)
                 return True
         return False
-
+    
     def on_volume_changed(self, volume_button, value):
-        # Convert the volume to a percentage for `wpctl`
+        """
+        Adjusts the system or application volume based on the value from the volume button.
+        """
+        # Convert the volume to a percentage for PipeWire or other audio backends
         volume_percentage = int(value * 100)
         try:
-            # Adjust the volume of the default output device (sink)
+            # Adjust the volume of the default output device
             subprocess.run(
                 ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{volume_percentage}%"],
                 check=True
             )
+            self.status_label.set_text(f"Volume set to {volume_percentage}%")
         except Exception as e:
-            print(f"Error adjusting volume with PipeWire: {e}")
+            print(f"Error adjusting volume: {e}")
+            self.status_label.set_text("Error adjusting volume")
 
     def on_sf2_query_tooltip(self, widget, x, y, keyboard_mode, tooltip):
         path = widget.get_path_at_pos(x, y)
@@ -796,24 +1217,32 @@ class MidiSoundfontTester(Gtk.Window):
 
     def on_file_selected(self, treeview, path, column):
         self.update_metadata()
+        if self.image_viewer:  # Update image pane only if enabled
+                            self.update_image_pane()  # Update image pane
         self.update_file_column_title()
         self.on_play(None)
 
     def update_file_column_title(self):
-        # Get total number of matching files
+        # Calculate the current index and total files
         total_matching_files = self.get_filtered_file_count()
-
-        # Get the index of the selected file in the filtered list
+    
         selection = self.all_treeview.get_selection()
         model, treeiter = selection.get_selected()
-        if treeiter is not None:
+    
+        if treeiter:
             path = model.get_path(treeiter)
             current_index = path.get_indices()[0] + 1  # Convert to one-based index
         else:
             current_index = 0
-
+    
         column_title = f"Files ({current_index} of {total_matching_files})"
-        self.all_treeview.get_column(0).set_title(column_title)
+        column = self.all_treeview.get_column(0)
+    
+        # Only update the title if it has changed to prevent unnecessary redraws
+        if column.get_title() != column_title:
+            def update_title():
+                column.set_title(column_title)
+            GLib.idle_add(update_title)  # Defer title update until other UI actions complete
 
     def get_filtered_file_count(self):
         count = 0
@@ -831,7 +1260,70 @@ class MidiSoundfontTester(Gtk.Window):
         if file_path:
             metadata = self.extract_metadata(file_path)
             buffer = self.metadata_view.get_buffer()
-            buffer.set_text(metadata)
+    
+            # Clear the buffer
+            buffer.set_text("")
+    
+            # Ensure the 'link' tag exists and is connected to the event signal
+            tag_table = buffer.get_tag_table()
+            link_tag = tag_table.lookup("link")
+            if not link_tag:
+                link_tag = buffer.create_tag(
+                    "link",
+                    foreground="#5275ba",
+                    underline=Pango.Underline.SINGLE
+                )
+                link_tag.connect("event", self.on_link_clicked)
+    
+            # Regex to detect URLs and email addresses
+            url_regex = re.compile(r'(https?://[^\s]+)')
+            email_regex = re.compile(r'[\w.-]+@[\w.-]+\.\w+')
+    
+            # Insert metadata into the buffer, formatting URLs and emails as links
+            start_iter = buffer.get_start_iter()
+            for line in metadata.splitlines():
+                url_matches = list(url_regex.finditer(line))
+                email_matches = list(email_regex.finditer(line))
+    
+                if not url_matches and not email_matches:
+                    # Insert line without links
+                    buffer.insert(start_iter, line + "\n")
+                    continue
+    
+                # Insert line with links
+                pos = 0
+                for match in sorted(url_matches + email_matches, key=lambda m: m.start()):
+                    start, end = match.start(), match.end()
+                    # Insert text before the match
+                    if pos < start:
+                        buffer.insert(start_iter, line[pos:start])
+                    # Insert the match as a link
+                    link_text = line[start:end]
+                    buffer.insert_with_tags_by_name(start_iter, link_text, "link")
+                    pos = end
+                # Insert the rest of the line
+                if pos < len(line):
+                    buffer.insert(start_iter, line[pos:])
+                buffer.insert(start_iter, "\n")
+    
+    def on_link_clicked(self, tag, widget, event, iter):
+        if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 1:  # Left-click
+            buffer = widget.get_buffer()
+            start = iter.copy()
+            if not start.starts_tag(tag):
+                start.backward_to_tag_toggle(tag)
+            end = start.copy()
+            if not end.ends_tag(tag):
+                end.forward_to_tag_toggle(tag)
+            link = buffer.get_text(start, end, True)
+            if link.startswith("http"):
+                # Open the URL in the default web browser
+                subprocess.run(["xdg-open", link])
+            elif "@" in link:
+                # Open the mail client for email links
+                subprocess.run(["xdg-email", link])
+            return True  # Event handled
+        return False
 
     def extract_metadata(self, file_path):
         if not self.radio:
@@ -850,7 +1342,7 @@ class MidiSoundfontTester(Gtk.Window):
                 extension = os.path.splitext(file_path)[1].lower()
                 metadata_lines = []
     
-                if extension in ['.mid', '.midi']:
+                if extension in ['.mid', '.midi'] and self.meta_extract:
                     # Extract MIDI-specific metadata using midicsv
                     with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_csv:
                         temp_csv_name = temp_csv.name
@@ -860,11 +1352,15 @@ class MidiSoundfontTester(Gtk.Window):
                         content = f.read()
     
                     os.remove(temp_csv_name)
-                    lines = content.splitlines()
     
-                    # Extract lines that contain metadata tags and remove the first three columns
+                    # Extract lines that contain metadata tags
+                    lines = content.splitlines()
                     for line in lines:
-                        if any(tag in line for tag in ["Title_t", "Text_t", "Copyright_t", "Composer", "Album", "Title", "Track_name", "Lyrics", "Metaeventtext", "Marker"]):
+                        if any(tag in line for tag in [
+                            "Title_t", "Text_t", "Copyright_t", "Composer", "Album",
+                            "Title", "Track_name", "Lyrics", "Metaeventtext", "Marker"
+                        ]):
+                            # Keep only the meaningful part of the line (after the first three columns)
                             columns = line.split(',', 3)
                             if len(columns) > 3:
                                 metadata_lines.append(columns[3].strip())
@@ -874,9 +1370,15 @@ class MidiSoundfontTester(Gtk.Window):
                     '.liq', '.masi', '.j2b', '.amf', '.med', '.rts', '.digi', '.sym',
                     '.dbm', '.qc', '.okt', '.sfx', '.far', '.umx', '.hmn', '.slt',
                     '.coco', '.ims', '.669', '.abk', '.uni', '.gmc'
-                ]:
+                ] and self.meta_extract:
                     # Extract MOD file metadata using openmpt123
-                    openmpt_result = subprocess.run(['openmpt123', '--info', file_path], capture_output=True, text=True)
+                    openmpt_result = subprocess.run(
+                        ['openmpt123', '--info', file_path],
+                        capture_output=True,
+                        text=True,
+                        errors='replace'  # Ensure subprocess output handles encoding errors
+                    )
+    
                     if openmpt_result.returncode == 0:
                         # Filter out the header lines from openmpt123 output
                         filtered_lines = []
@@ -887,48 +1389,57 @@ class MidiSoundfontTester(Gtk.Window):
                             elif line.startswith("Type"):  # Detect start of relevant metadata
                                 header_end_reached = True
                                 filtered_lines.append(line)
-                        
+    
                         metadata_lines.extend(filtered_lines)
                     else:
                         metadata_lines.append("No metadata available for this MOD file.")
     
                 else:
-                    metadata_lines.append("Unknown file type.")
-
+                    metadata_lines.append("Unknown file type or file metadata extraction disabled.")
+    
                 # Extract the containing directory from the file path
                 containing_directory = os.path.dirname(path)
                 info_txt_path = os.path.join(containing_directory, "info.txt")
                 info_txt = ""
-                
+    
                 # Check if info.txt exists in the containing directory
                 if os.path.isfile(info_txt_path):
-                    with open(info_txt_path, "r") as f:
+                    with open(info_txt_path, "r", encoding="utf-8", errors="replace") as f:
                         info_txt = f.read()  # Read the contents of info.txt
     
                 # Combine file details with extracted metadata
-                metadata = (
-                    f"Filename: {filename}\n"
-                    f"Path: {path}\n"
-                    f"File Size: {filesize_str}\n"
-                    + (f"Info.txt: {info_txt}\n" if info_txt else "")
-                    + "\n*** Metadata info ***\n" + "\n".join(metadata_lines)
-                )
-    
                 if not metadata_lines:  # If no metadata found, add a placeholder
-                    metadata += "\n\n**NO METADATA AVAILABLE FOR THIS FILE**"
+                    metadata = (
+                        f"Filename: {filename}\n"
+                        f"Path: {path}\n"
+                    f"File Size: {filesize_str}\n\n"
+                    + "*** Metadata Info ***\n"
+                    + "Unavailable\n"
+                    + (f"\nInfo.txt: {info_txt}\n" if info_txt else "")
+                    )
+                else:
+                    metadata = (
+                        f"Filename: {filename}\n"
+                        f"Path: {path}\n"
+                    f"File Size: {filesize_str}\n\n"
+                    + "*** Metadata Info ***\n"
+                    + "\n".join(metadata_lines) + "\n"
+                    + (f"\nInfo.txt: {info_txt}\n" if info_txt else "")
+                    )
     
                 return metadata
     
             except Exception as e:
                 return f"Error extracting metadata: {e}"
         else:
+            # Radio metadata
             metadata = (
                 f"Track Name: {self.stream_title}\n"
                 f"Title: {self.streams[self.current_stream_index]['title']}\n"
                 f"URL: {self.streams[self.current_stream_index]['url']}\n"
                 f"Genre: Game\n"
             )
-                
+    
             return metadata
     
     def on_play(self, button):
@@ -953,7 +1464,8 @@ class MidiSoundfontTester(Gtk.Window):
                         threading.Thread(target=self.monitor_fluidsynth_output, daemon=True).start()
                         self.status_label.set_text(f"Playing: {file_path} + {os.path.basename(sf2_file)}")
                         self.status_label.set_tooltip_text(f"{file_path} + {os.path.basename(sf2_file)}")
-
+                        if self.image_viewer:  # Update image pane only if enabled
+                            self.update_image_pane()
                     except Exception as e:
                         print(f"Failed to start fluidsynth: {e}")
                         self.fluidsynth_process = None
@@ -973,12 +1485,16 @@ class MidiSoundfontTester(Gtk.Window):
                     threading.Thread(target=self.monitor_xmp_output, daemon=True).start()
                     # Update status label
                     self.status_label.set_text(f"Playing: {file_path}")
+                    if self.image_viewer:  # Update image pane only if enabled
+                            self.update_image_pane()
                 except Exception as e:
                     print(f"Failed to start xmp: {e}")
                     self.xmp_process = None
                     self.status_label.set_text("Error: Unable to play")
         else:
             self.status_label.set_text("No file selected")
+        self.metadata_view.set_editable(False)  # Make it read-only
+        self.metadata_view.set_cursor_visible(True)  # Allow cursor interaction
         self.update_metadata()
 
     def monitor_xmp_output(self):
@@ -1069,64 +1585,122 @@ class MidiSoundfontTester(Gtk.Window):
         self.stop_stream()
         self.stop_fluidsynth()
         self.stop_xmp()
-
-        selection = self.all_treeview.get_selection()
-        model, treeiter = selection.get_selected()
-
-        if treeiter:
-            path = model.get_path(treeiter)
-            index = path.get_indices()[0]
-            if index > 0:
-                prev_path = Gtk.TreePath(index - 1)
-            else:
-                # Loop back to the last item
-                total_rows = self.get_filtered_file_count()
-                prev_path = Gtk.TreePath(total_rows - 1)
-            self.all_treeview.set_cursor(prev_path)
-            self.all_treeview.scroll_to_cell(prev_path)
+    
+        # Get all rows in the filter
+        iter_list = []
+        iter = self.all_filter.get_iter_first()
+        while iter:
+            iter_list.append(iter)
+            iter = self.all_filter.iter_next(iter_list[-1])
+    
+        if self.shuffle_mode and iter_list:
+            # Select a random row
+            random_iter = random.choice(iter_list)
+            path = self.all_filter.get_path(random_iter)
+            self.all_treeview.set_cursor(path)
+            self.all_treeview.scroll_to_cell(path, None, True, 0.5, 0.5)
         else:
-            # No selection, select the last item
-            total_rows = self.get_filtered_file_count()
-            if total_rows > 0:
-                prev_path = Gtk.TreePath(total_rows - 1)
+            # Normal previous behaviour
+            selection = self.all_treeview.get_selection()
+            model, treeiter = selection.get_selected()
+    
+            if treeiter:
+                path = model.get_path(treeiter)
+                index = path.get_indices()[0]
+                if index > 0:
+                    prev_path = Gtk.TreePath(index - 1)
+                else:
+                    # Loop back to the last item
+                    total_rows = self.get_filtered_file_count()
+                    prev_path = Gtk.TreePath(total_rows - 1)
                 self.all_treeview.set_cursor(prev_path)
-                self.all_treeview.scroll_to_cell(prev_path)
-
+                self.all_treeview.scroll_to_cell(prev_path, None, True, 0.5, 0.5)
+            else:
+                # No selection, select the last item
+                total_rows = self.get_filtered_file_count()
+                if total_rows > 0:
+                    prev_path = Gtk.TreePath(total_rows - 1)
+                    self.all_treeview.set_cursor(prev_path)
+                    self.all_treeview.scroll_to_cell(prev_path, None, True, 0.5, 0.5)
+    
         self.update_metadata()
         self.update_file_column_title()
         self.on_play(None)
 
+    def get_tree_path_for_file(self, file_path):
+        """Finds the tree path for the given file in the filtered list."""
+        iter = self.all_filter.get_iter_first()
+        while iter:
+            if self.all_filter[iter][2] == file_path:  # Compare file paths
+                return self.all_filter.get_path(iter)
+            iter = self.all_filter.iter_next(iter)
+        return None
+
+    def get_tree_path_for_iter(self, iter):
+        """Helper function to retrieve path for a given iter."""
+        if iter:
+            return self.all_filter.get_path(iter)
+        return None
+
+    def reset_horizontal_scroll(self):
+        """Ensure the horizontal scroll bar resets to the left using the ScrolledWindow."""
+        scrolled_window = self.all_treeview.get_parent()
+        if isinstance(scrolled_window, Gtk.ScrolledWindow):
+            h_adjustment = scrolled_window.get_hadjustment()
+            if h_adjustment:
+                h_adjustment.set_value(0)  # Set the horizontal adjustment value to 0
+
     def on_next(self, button):
+        # Stop any active streams or playback
         self.stop_stream()
         self.stop_fluidsynth()
         self.stop_xmp()
-        
-        selection = self.all_treeview.get_selection()
-        model, treeiter = selection.get_selected()
-
-        if treeiter:
-            next_iter = self.all_filter.iter_next(treeiter)
-            if next_iter:
-                path = self.all_filter.get_path(next_iter)
-                self.all_treeview.set_cursor(path)
-                self.all_treeview.scroll_to_cell(path)
-            else:
-                # Loop back to the first item
-                iter = self.all_filter.get_iter_first()
-                if iter:
-                    path = self.all_filter.get_path(iter)
-                    self.all_treeview.set_cursor(path)
-                    self.all_treeview.scroll_to_cell(path)
-        else:
-            # No selection, select the first item
+    
+        def scroll_to_path(path):
+            if path:
+                column = self.all_treeview.get_column(0)
+                self.all_treeview.set_cursor(path, column, False)  # Set the cursor
+                self.all_treeview.scroll_to_cell(path, column, True, 0.5, 0.0)  # Scroll to the cell
+                self.all_treeview.queue_draw()  # Force a redraw after scrolling
+                scrolled_window = self.all_treeview.get_parent()
+                if isinstance(scrolled_window, Gtk.ScrolledWindow):
+                    scrolled_window.queue_draw()  # Ensure the scrolled window updates its state
+    
+        # Determine the next path
+        if self.shuffle_mode:
+            # Shuffle mode: Pick a random visible row
+            iter_list = []
             iter = self.all_filter.get_iter_first()
-            if iter:
-                path = self.all_filter.get_path(iter)
-                self.all_treeview.set_cursor(path)
-                self.all_treeview.scroll_to_cell(path)
+            while iter:
+                iter_list.append(iter)
+                iter = self.all_filter.iter_next(iter)
+    
+            if iter_list:
+                random_iter = random.choice(iter_list)
+                path = self.all_filter.get_path(random_iter)
+            else:
+                path = None
+        else:
+            # Sequential mode: Move to the next visible row
+            selection = self.all_treeview.get_selection()
+            model, treeiter = selection.get_selected()
+    
+            if treeiter:
+                next_iter = self.all_filter.iter_next(treeiter)
+                path = self.all_filter.get_path(next_iter) if next_iter else None
+            else:
+                # If no selection, start from the first row
+                iter = self.all_filter.get_iter_first()
+                path = self.all_filter.get_path(iter) if iter else None
+    
+        # Ensure the tree view updates to the selected path
+        if path:
+            scroll_to_path(path)
+        else:
+            self.all_treeview.get_selection().unselect_all()
 
+        # Update metadata and play the file
         self.update_metadata()
-        self.update_file_column_title()
         self.on_play(None)
 
     def on_save(self, button):
@@ -1176,10 +1750,15 @@ class MidiSoundfontTester(Gtk.Window):
                 wav_output = os.path.join(output_dir, f"{file_basename}.wav")
                 mp3_output = os.path.join(output_dir, f"{file_basename}.mp3")
                 try:
+                    self.on_pause(button)  # Pause playback
+                    try:
+                        subprocess.run(["ffmpeg", "-y", "-i", file_path, wav_output], check=True)
+                        subprocess.run(["lame", wav_output, mp3_output], check=True)
+                    finally:
+                        self.on_play(button)  # Resume playback
                     # Convert non-MIDI file to WAV using ffmpeg
-                    subprocess.run(["ffmpeg", "-y", "-i", file_path, wav_output], check=True)
+                    # subprocess.run(["ffmpeg", "-y", "-i", file_path, wav_output], check=True)
                     # Convert WAV to MP3 using lame
-                    subprocess.run(["lame", wav_output, mp3_output], check=True)
                     os.remove(wav_output)
                     dialog = Gtk.MessageDialog(
                         parent=self,
@@ -1293,98 +1872,54 @@ class MidiSoundfontTester(Gtk.Window):
         self.spinner.stop()
         dialog.destroy()
 
+
+    def on_meta_extract_toggled(self, menuitem):
+        self.meta_extract = not self.meta_extract
+        GLib.idle_add(self.status_label.set_text, f"Metadata Extraction {'Enabled' if self.meta_extract else 'Disabled'}")
+
     def on_shuffle_mode_toggled(self, menuitem):
-        self.shuffle_mode = menuitem.get_active()
-    
-        # Create and show progress dialog
-        self.spinner.start()
-        progress_dialog = self.create_progress_dialog("Shuffling Playlist", "Please wait while the playlist is being shuffled...")
-    
-        def background_task():
-            try:
-                # Step 1: Load all files in background and update progress dialog
-                GLib.idle_add(progress_dialog.update_text, "Loading files...")
-                self.all_files = self.find_all_files()
+        self.shuffle_mode = not self.shuffle_mode
+        GLib.idle_add(self.status_label.set_text, f"Shuffle Mode {'Enabled' if self.shuffle_mode else 'Disabled'}")
 
-                if not self.all_files:
-                    GLib.idle_add(progress_dialog.update_text, "No files found to shuffle.")
-                    GLib.idle_add(progress_dialog.close)
-                    GLib.idle_add(self.spinner.stop)
-                    return
+    def on_image_viewer_toggled(self, menuitem):
+        self.image_viewer = menuitem.get_active()  # Update the toggle state
+        self.update_image_viewer_visibility()
+        self.status_label.set_text(f"Image Viewer {'Enabled' if self.image_viewer else 'Disabled'}")
+        
+        # Disable Online Services if Image Viewer is turned off
+        if not self.image_viewer and self.online_services:
+            self.online_services = False
+            self.online_services_menuitem.handler_block_by_func(self.on_online_services_toggled)
+            self.online_services_menuitem.set_active(False)  # Update the menu item state
+            self.online_services_menuitem.handler_unblock_by_func(self.on_online_services_toggled)
+            self.status_label.set_text("Online Services Disabled because Image Viewer was turned off")
+    
+        # Update the image pane only if Image Viewer is enabled
+        if self.image_viewer:
+            self.update_image_pane()
+    
+    def on_online_services_toggled(self, menuitem):
+        self.online_services = menuitem.get_active()  # Update the toggle state
+        self.status_label.set_text(f"Online Services {'Enabled' if self.online_services else 'Disabled'}")
+        
+        # If Online Services is enabled, ensure Image Viewer is also enabled
+        if self.online_services and not self.image_viewer:
+            self.image_viewer = True
+            self.image_viewer_menuitem.handler_block_by_func(self.on_image_viewer_toggled)
+            self.image_viewer_menuitem.set_active(True)  # Update the menu item state
+            self.image_viewer_menuitem.handler_unblock_by_func(self.on_image_viewer_toggled)
+            self.update_image_viewer_visibility()
+            self.status_label.set_text("Image Viewer Enabled because Online Services were enabled")
+        
+        # Update the image pane only if Online Services is enabled
+        if self.online_services:
+            self.update_image_pane()
 
-                # Step 2: Shuffle files
-                if self.shuffle_mode:
-                    GLib.idle_add(progress_dialog.update_text, "Shuffling files...")
-                    random.shuffle(self.all_files)
-
-                # Step 3: Load shuffled files into the store
-                GLib.idle_add(progress_dialog.update_text, "Loading shuffled files into store...")
-                GLib.idle_add(self.load_all_files)
-
-                # Step 4: Update UI with the shuffled data
-                GLib.idle_add(self.update_metadata)
-                GLib.idle_add(self.update_file_column_title)
-                GLib.idle_add(self.status_label.set_text, "Shuffle mode updating...")
-
-            except Exception as e:
-                print(f"Error during shuffle mode: {e}")
-                GLib.idle_add(self.status_label.set_text, "An error occurred during shuffle mode.")
-
-            finally:
-                # Close progress dialog automatically once the task is done
-                GLib.idle_add(progress_dialog.close)
-                GLib.idle_add(self.spinner.stop)
-
-        threading.Thread(target=background_task, daemon=True).start()
-
-    def create_progress_dialog(self, title, message):
-        dialog = Gtk.Dialog(
-            title=title,
-            transient_for=self,
-            modal=True,
-            destroy_with_parent=True,
-        )
-        dialog.set_resizable(False)
-        dialog.get_content_area().set_border_width(10)
-    
-        # Create and configure the label for the progress message
-        label = Gtk.Label(label=message)
-        label.set_justify(Gtk.Justification.LEFT)
-        label.set_line_wrap(True)
-        label.set_line_wrap_mode(Pango.WrapMode.WORD)
-        dialog.get_content_area().pack_start(label, False, False, 0)
-    
-        # Create and configure the progress bar
-        progress_bar = Gtk.ProgressBar()
-        progress_bar.set_pulse_step(0.1)
-        dialog.get_content_area().pack_start(progress_bar, False, False, 10)
-    
-        # Show all dialog elements
-        dialog.show_all()
-    
-        # Pulse progress bar to show activity using GLib.timeout_add
-        def pulse_progress_bar():
-            if dialog.get_visible():
-                progress_bar.pulse()
-                return True  # Continue pulsing
-            return False  # Stop pulsing if dialog is closed
-    
-        GLib.timeout_add(100, pulse_progress_bar)  # Pulse every 100ms
-    
-        # Utility to update text
-        def update_text(new_message):
-            label.set_text(new_message)
-    
-        # Utility to close dialog
-        def close_dialog():
-            dialog.destroy()
-    
-        # Attach update and close methods to dialog using `setattr`
-        setattr(dialog, 'update_text', update_text)
-        setattr(dialog, 'close', close_dialog)
-    
-        return dialog
-
+    def update_image_viewer_visibility(self):
+        if self.image_viewer:
+            self.image_box.show_all()
+        else:
+            self.image_box.hide()
 
     def on_licence(self, menuitem):
         # Licence information text
@@ -1516,40 +2051,53 @@ class MidiSoundfontTester(Gtk.Window):
     def on_next_auto(self):
         self.stop_fluidsynth()
         self.stop_xmp()
-
-        selection = self.all_treeview.get_selection()
-        model, treeiter = selection.get_selected()
-
-        if treeiter:
-            next_iter = self.all_filter.iter_next(treeiter)
-            if next_iter:
-                path = self.all_filter.get_path(next_iter)
-                self.all_treeview.set_cursor(path)
-                self.all_treeview.scroll_to_cell(path)
-                self.update_metadata()
-                self.update_file_column_title()
-                self.on_play(None)
-            else:
-                # Loop back to the first item
-                iter = self.all_filter.get_iter_first()
-                if iter:
-                    path = self.all_filter.get_path(iter)
-                    self.all_treeview.set_cursor(path)
-                    self.all_treeview.scroll_to_cell(path)
-                    self.update_metadata()
-                    self.update_file_column_title()
-                    self.on_play(None)
-        else:
-            # No selection, select the first item
+    
+        def scroll_to_path(path):
+            if path:
+                column = self.all_treeview.get_column(0)
+                self.all_treeview.set_cursor(path, column, False)  # Set the cursor
+                self.all_treeview.scroll_to_cell(path, column, True, 0.5, 0.0)  # Scroll to the cell
+                self.all_treeview.queue_draw()  # Force a redraw after scrolling
+                scrolled_window = self.all_treeview.get_parent()
+                if isinstance(scrolled_window, Gtk.ScrolledWindow):
+                    scrolled_window.queue_draw()  # Ensure the scrolled window updates its state
+    
+        # Determine the next path
+        if self.shuffle_mode:
+            # Shuffle mode: Pick a random visible row
+            iter_list = []
             iter = self.all_filter.get_iter_first()
-            if iter:
-                path = self.all_filter.get_path(iter)
-                self.all_treeview.set_cursor(path)
-                self.all_treeview.scroll_to_cell(path)
-                self.update_metadata()
-                self.update_file_column_title()
-                self.on_play(None)
-        return False
+            while iter:
+                iter_list.append(iter)
+                iter = self.all_filter.iter_next(iter)
+    
+            if iter_list:
+                random_iter = random.choice(iter_list)
+                path = self.all_filter.get_path(random_iter)
+            else:
+                path = None
+        else:
+            # Sequential mode: Move to the next visible row
+            selection = self.all_treeview.get_selection()
+            model, treeiter = selection.get_selected()
+    
+            if treeiter:
+                next_iter = self.all_filter.iter_next(treeiter)
+                path = self.all_filter.get_path(next_iter) if next_iter else None
+            else:
+                # If no selection, start from the first row
+                iter = self.all_filter.get_iter_first()
+                path = self.all_filter.get_path(iter) if iter else None
+    
+        # Ensure the tree view updates to the selected path
+        if path:
+            scroll_to_path(path)
+        else:
+            self.all_treeview.get_selection().unselect_all()
+    
+        # Update metadata and play the file
+        self.update_metadata()
+        self.on_play(None)
 
 if __name__ == "__main__":
     app = MidiSoundfontTester()

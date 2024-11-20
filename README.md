@@ -69,27 +69,78 @@ The Python version provides a graphical interface for testing MIDI files with So
 python3 soundfontTest.py
 ```
 
-Ensure that the following dependencies are installed:
+To fully utilise the script you provided, the following Python dependencies and system requirements are necessary:
 
+### Python Libraries
 ```
-Python 3
-PyGObject (to provide GTK support)
-gir1.2-gtk-3.0
-libglib2.0-dev
-libasound2-dev
-libjack-dev
-libpulse-dev
-openmpt123
-xmp
-fluidsynth, timidity, lame, midicsv, shuf, and other system tools as required in the Bash version)
+os - Built-in; no installation required.
+subprocess - Built-in; no installation required.
+threading - Built-in; no installation required.
+random - Built-in; no installation required.
+signal - Built-in; no installation required.
+sys - Built-in; no installation required.
+shutil - Built-in; no installation required.
+tempfile - Built-in; no installation required.
+time - Built-in; no installation required.
+requests - Install using pip install requests.
+re - Built-in; no installation required.
+webbrowser - Built-in; no installation required.
+gi (PyGObject) - Install via your package manager (e.g., sudo apt install python3-gi gir1.2-gtk-3.0) or via pip (pip install PyGObject).
+Pillow (PIL) - Install using pip install Pillow.
+base64 - Built-in; no installation required.
+traceback - Built-in; no installation required.
+selenium - Install using pip install selenium.
+io - Built-in; no installation required.
 ```
+
+## PyGObject Modules
+Ensure these libraries are available, typically through your system's package manager:
+
+`Gtk 3.0 (gi.require_version('Gtk', '3.0'))`
+`GdkPixbuf 2.0 (gi.require_version('GdkPixbuf', '2.0'))`
+`GObject Introspection`
+`GLib`
+
+### External Dependencies
+
+The script depends on several command-line tools and libraries:
+
+`fluidsynth` - Install via your system's package manager (e.g., `sudo apt install fluidsynth`).
+`timidity` - Install via your system's package manager.
+`strings` (from binutils) - Typically available by default or via `sudo apt install binutils`.
+`lame` - Install via your system's package manager (e.g., `sudo apt install lame`).
+`find` - Usually pre-installed on Linux.
+`shuf` - Provided by the coreutils package (standard on Linux).
+`pgrep` - Usually pre-installed.
+`midicsv` - Install via your package manager.
+`xmp` - Install using sudo apt install xmp.
+`openmpt123` - Install via sudo apt install openmpt123.
+`mplayer` - Install via your system's package manager (e.g., sudo apt install mplayer).
+`chromedriver` - Download from ChromeDriver's official site.
+
+### Notes
+Ensure the `chromedriver` version matches your installed Google Chrome version.
+Use a modern Linux distribution with access to the required tools.
+Some components, like `fluidsynth` and `lame`, require appropriate configurations or paths.
+
 Place `soundfontpy.png` in the root folder. 
+Place `image.jpg` (fallback art placeholder) in the root folder. 
 
 Key Features of the Python Version:
 
 - Graphical User Interface (GUI) : The Python version provides a GTK-based GUI for selecting and playing MIDI and MOD packed files.
 - SoundFont and Track Switching : Switch between SoundFonts and MIDI tracks using the GUI controls.
 - Dark Mode and Shuffle : Options to enable dark mode and shuffle mode for MIDI tracks.
+- Image Scraping : (will use image.jpg placed in the media directory if present), will download an image based on the name of the containing folder and save as `image.jpg`. It is best therefore to organise your files into `~/MIDI/{title}/{song}.*` to mitigate random images being displayed.
+
+### Installation Summary
+Run the following to install most Python dependencies:
+
+`pip install requests Pillow selenium PyGObject`
+
+Use your system's package manager to install external tools:
+
+`sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-gdkpixbuf-2.0 fluidsynth timidity binutils lame midicsv xmp openmpt123 mplayer`
 
 ## Additional
 The program will also convert the MIDI file to .csv and store them in newly created `tmp/*` folders, which you can view during playback. All temporary folders are deleted on exit.

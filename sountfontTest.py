@@ -26,6 +26,7 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException,
 gi.require_version('Gtk', '3.0')
 gi.require_version('GdkPixbuf', '2.0')  # Specify the GdkPixbuf version
 from gi.repository import Gtk, Gdk, Pango, GLib, GObject, GdkPixbuf
+import mido
 
 try:
     import gi
@@ -105,6 +106,11 @@ class MidiSoundfontTester(Gtk.Window):
         Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", True)
 
         self.set_icon_name("multimedia-player")
+
+        #build favourites
+        self.favourites_file = os.path.join(os.getcwd(), "favourites.list")
+        self.favourites = set()  # Store favourited file paths
+        self.load_favourites()  # Load favourites on startup
         
         # Initialize variables
         self.source_dir = os.path.expanduser("~")  # Default source directory
@@ -123,6 +129,8 @@ class MidiSoundfontTester(Gtk.Window):
             "mplayer",
         ]
         self.check_requirements()
+
+        self.elapsed_timer = None  # Ensure this is initialized here
 
         # File lists
         self.all_files = self.find_all_files()
@@ -146,6 +154,7 @@ class MidiSoundfontTester(Gtk.Window):
         self.current_pixbuf = None  # Initialise as None
         self.meta_extract = True
         self.image_viewer = True
+        self.fluidsynth_stopped_intentionally = False  # Initialize the flag
 
         # Build UI
         self.build_ui()
@@ -216,6 +225,10 @@ class MidiSoundfontTester(Gtk.Window):
         select_sf2_item = Gtk.MenuItem(label="📂 Select SoundFont Directory...")
         select_sf2_item.connect("activate", self.on_select_sf2_source)
         file_menu.append(select_sf2_item)
+
+        select_output_item = Gtk.MenuItem(label="📂 Open Output Directory...")
+        select_output_item.connect("activate", self.on_select_output_source)
+        file_menu.append(select_output_item)
     
         quit_item = Gtk.MenuItem(label="❌ Quit")
         quit_item.connect("activate", self.on_quit)
@@ -236,12 +249,6 @@ class MidiSoundfontTester(Gtk.Window):
         self.online_services_menuitem.set_active(self.online_services)
         self.online_services_menuitem.connect("toggled", self.on_online_services_toggled)
         settings_menu.append(self.online_services_menuitem)
-
-        # Create Metadata Extractor menu item
-        self.meta_extract_menuitem = Gtk.CheckMenuItem(label="🏷️ Embedded Metadata")
-        self.meta_extract_menuitem.set_active(self.meta_extract)
-        self.meta_extract_menuitem.connect("toggled", self.on_meta_extract_toggled)
-        settings_menu.append(self.meta_extract_menuitem)
     
         # Create the View Menu
         view_menu = Gtk.Menu()
@@ -253,6 +260,12 @@ class MidiSoundfontTester(Gtk.Window):
         self.image_viewer_menuitem.set_active(self.image_viewer)
         self.image_viewer_menuitem.connect("toggled", self.on_image_viewer_toggled)
         view_menu.append(self.image_viewer_menuitem)
+
+        # Create Metadata Extractor menu item
+        self.meta_extract_menuitem = Gtk.CheckMenuItem(label="🏷️ Embedded Metadata")
+        self.meta_extract_menuitem.set_active(self.meta_extract)
+        self.meta_extract_menuitem.connect("toggled", self.on_meta_extract_toggled)
+        view_menu.append(self.meta_extract_menuitem)
 
         # Create Dark Mode menu item
         dark_mode_item = Gtk.CheckMenuItem(label="🌗 Dark Mode")
@@ -399,6 +412,25 @@ class MidiSoundfontTester(Gtk.Window):
         scrolled_window_image.set_size_request(300, 220)
         scrolled_window_image.add(self.image_pane)
         self.image_box.pack_start(scrolled_window_image, True, True, 0)
+
+        self.image_box.set_name("image_viewer_container")  # Assign ID
+
+        # Create a CSS provider for the image viewer
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b"""
+            #image_viewer,
+            #image_viewer_container,
+            #image_viewer_scrolled_window {
+                background-color: rgba(0, 0, 0, 0);
+            }
+        """)
+    
+        # Apply the CSS provider to the widgets
+        widgets_to_style = [self.image_pane, self.image_box, scrolled_window_image]
+        for widget in widgets_to_style:
+            widget.get_style_context().add_provider(
+                css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
         
         # Add image_box to the upper pane
         upper_hpaned.add2(self.image_box)
@@ -431,6 +463,26 @@ class MidiSoundfontTester(Gtk.Window):
         
         vpaned.add2(metadata_box)
 
+        # Assign IDs to parent containers if not already done
+        upper_hpaned.set_name("upper_pane")
+        vpaned.set_name("vertical_pane")
+        
+        # Update your CSS to include these containers
+        css_provider.load_from_data(b"""
+            #image_viewer,
+            #image_viewer_container,
+            #image_viewer_scrolled_window {
+                background-color: rgba(0, 0, 0, 0);
+            }
+        """)
+        
+        # Apply the CSS provider to the new widgets
+        widgets_to_style.extend([upper_hpaned, vpaned])
+        for widget in widgets_to_style:
+            widget.get_style_context().add_provider(
+                css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+
     def on_resize_upper_pane(self, widget, allocation):
         total_height = allocation.height
         current_position = widget.get_position()
@@ -446,10 +498,6 @@ class MidiSoundfontTester(Gtk.Window):
         total_width = allocation.width  # Get the total width of the parent container
         sf2_pane_width = max(total_width - self.image_pane_width, 0)  # Ensure non-negative width
         widget.set_position(sf2_pane_width)  # Dynamically adjust the SF2 pane's width
-
-    def on_resize_set_image_pane_width(self, widget, allocation):
-        widget.set_position(300)  # Set the image pane to a fixed width
-        upper_hpaned.connect("size-allocate", self.on_resize_set_image_pane_width)
 
     def on_resize_set_upper_pane_height(self, widget, allocation):
         min_height = 280  # Minimum height for upper panes
@@ -489,12 +537,22 @@ class MidiSoundfontTester(Gtk.Window):
                     self.image_pane.set_tooltip_text("[ERROR] Failed to fetch and save image")
             else:
                 # Fallback to a default image
-                self.scale_image_to_fit("image.jpg")
-                self.image_pane.set_tooltip_text("Fallback Image")
+                default_image_path = os.path.join(os.getcwd(), "image.jpg")
+                if os.path.isfile(default_image_path):
+                    self.scale_image_to_fit(default_image_path)
+                    self.image_pane.set_tooltip_text("Fallback Image")
+                else:
+                    self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
+                    self.image_pane.set_tooltip_text("Default image not found")
         else:
-            # On launch or when no file is selected
-            self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
-            self.image_pane.set_tooltip_text("Image missing")
+            # On launch or when no file is selected, display the default image
+            default_image_path = os.path.join(os.getcwd(), "image.jpg")
+            if os.path.isfile(default_image_path):
+                self.scale_image_to_fit(default_image_path)
+                self.image_pane.set_tooltip_text("Default Image")
+            else:
+                self.image_pane.set_from_icon_name("image-missing", Gtk.IconSize.DIALOG)
+                self.image_pane.set_tooltip_text("Default image not found")
 
     def scale_image_to_fit(self, image_path):
         try:
@@ -522,16 +580,6 @@ class MidiSoundfontTester(Gtk.Window):
         else:
             filename = ''
         cell.set_property('text', filename)
-
-    def on_hpaned_size_allocate(self, widget, allocation):
-        total_width = allocation.width
-        position = int(total_width * 33 / 100)
-        widget.set_position(position)
-
-    def on_vpaned_size_allocate(self, widget, allocation):
-        total_height = allocation.height
-        position = int(total_height * 50 / 100)
-        widget.set_position(position)
 
     def create_media_controls(self, grid):
         controls_box = Gtk.Box(
@@ -605,7 +653,11 @@ class MidiSoundfontTester(Gtk.Window):
             return button
             
         # Radio Button
-        self.radio_button = create_round_button("network-wireless", "LiquidDOS Radio", self.on_radio)
+        self.fav_button = create_round_button("starred", "Favourites", self.on_fav)
+        controls_box.pack_start(self.fav_button, False, False, 0)
+        
+        # Radio Button
+        self.radio_button = create_round_button("network-wireless", "Stream Online Radio", self.on_radio)
         controls_box.pack_start(self.radio_button, False, False, 0)
     
         # Previous Button
@@ -623,7 +675,14 @@ class MidiSoundfontTester(Gtk.Window):
         # Next Button
         self.next_button = create_round_button("media-skip-forward", "Next", self.on_next)
         controls_box.pack_start(self.next_button, False, False, 0)
-    
+
+        # **Add the new playback label here**
+        self.playback_label = Gtk.Label(label="00:00 / 00:00")
+        self.playback_label.set_margin_start(10)  # Add some space between the button and label
+        self.playback_label.set_justify(Gtk.Justification.LEFT)
+        self.apply_monospace_font(self.playback_label)
+        controls_box.pack_start(self.playback_label, False, False, 0)
+
         # Create a right-aligned box for the status label
         status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         status_box.set_hexpand(True)  # Allow it to expand horizontally within controls_box
@@ -665,9 +724,6 @@ class MidiSoundfontTester(Gtk.Window):
         
         # Add the button to the controls box
         controls_box.pack_start(self.save_button, False, False, 0)
-        
-        # Start the spinner initially to test visibility
-        self.spinner.start()
 
     def on_button_press(self, widget, event):
         if event.button == Gdk.BUTTON_PRIMARY:  # Left mouse button
@@ -716,39 +772,6 @@ class MidiSoundfontTester(Gtk.Window):
                     else:
                         print(f"Unhandled link type: {link_text}")
 
-    def on_motion_notify(self, widget, event):
-        buffer = self.metadata_view.get_buffer()
-        x, y = self.metadata_view.window_to_buffer_coords(Gtk.TextWindowType.TEXT, int(event.x), int(event.y))
-    
-        # Ensure the method call returns valid results
-        try:
-            found_iter, text_iter = self.metadata_view.get_iter_at_location(x, y)
-        except Exception as e:
-            text_iter = None
-    
-        if not text_iter or not found_iter:
-            # Reset cursor to default if no iter is found
-            window = self.metadata_view.get_window(Gtk.TextWindowType.TEXT)
-            if window:
-                window.set_cursor(None)
-            return
-    
-        # Check if the iter has the "link" tag
-        tag_table = buffer.get_tag_table()
-        link_tag = tag_table.lookup("link")
-    
-        if link_tag and link_tag in text_iter.get_tags():
-            # Change cursor to pointer
-            window = self.metadata_view.get_window(Gtk.TextWindowType.TEXT)
-            if window:
-                pointer_cursor = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
-                window.set_cursor(pointer_cursor)
-        else:
-            # Reset cursor to default
-            window = self.metadata_view.get_window(Gtk.TextWindowType.TEXT)
-            if window:
-                window.set_cursor(None)
-
     def create_context_menu(self):
         """Creates a context menu for the file list."""
         self.context_menu = Gtk.Menu()
@@ -787,8 +810,59 @@ class MidiSoundfontTester(Gtk.Window):
         details_item = Gtk.MenuItem(label="Game Details...")
         details_item.connect("activate", self.on_details)
         self.context_menu.append(details_item)
+
+        # Add "Toggle Favourite" Option
+        self.toggle_favourite_item = Gtk.MenuItem(label="Add to Favourites")
+        self.toggle_favourite_item.connect("activate", self.on_toggle_favourite)
+        self.context_menu.append(self.toggle_favourite_item)
+        self.context_menu.show_all()
+
+        # Add "Export to .CSV" option
+        self.csv_item = Gtk.MenuItem(label="Export to .CSV...")
+        self.csv_item.connect("activate", self.on_csv)
+        self.context_menu.append(self.csv_item)
+        self.csv_item.set_visible(False)  # Initially hide it
+
+        # Add "View Metadata" Option
+        self.view_meta_item = Gtk.MenuItem(label="View Metadata...")
+        self.view_meta_item.connect("activate", self.on_view_meta)
+        self.context_menu.append(self.view_meta_item)
+        self.view_meta_item.set_visible(False)  # Initially hide it
+
+        # Add "Add/Replace Artwork" Option
+        self.add_replace_artwork_item = Gtk.MenuItem(label="Add/Replace Artwork...")
+        self.add_replace_artwork_item.connect("activate", self.on_add_replace_artwork)
+        self.context_menu.append(self.add_replace_artwork_item)
+        self.add_replace_artwork_item.set_visible(False)  # Initially hide it
         
         self.context_menu.show_all()
+
+    def on_toggle_favourite(self, menuitem):
+        file_path = self.get_selected_file()
+        if file_path:
+            iter = self.find_row_iter_by_file(file_path)
+            if iter:
+                display_name = self.all_store[iter][0]
+                if file_path in self.favourites:
+                    self.favourites.remove(file_path)
+                    self.all_store[iter][0] = display_name.lstrip("*")
+                    self.status_label.set_text(f"{display_name} removed from favourites.")
+                else:
+                    self.favourites.add(file_path)
+                    self.all_store[iter][0] = f"*{display_name}"
+                    self.status_label.set_text(f"{display_name} added to favourites.")
+                self.save_favourites()  # Save changes to the file
+            self.all_filter.refilter()
+            self.update_file_column_title()
+
+    def find_row_iter_by_file(self, file_path):
+        # Iterate through the ListStore to find the row with the matching file path
+        iter = self.all_store.get_iter_first()
+        while iter:
+            if self.all_store[iter][2] == file_path:  # Compare file paths (3rd column)
+                return iter
+            iter = self.all_store.iter_next(iter)
+        return None
     
     def update_context_menu_tooltip(self, file_path):
         """Updates the tooltip at the top of the context menu."""
@@ -800,7 +874,128 @@ class MidiSoundfontTester(Gtk.Window):
             else:
                 label.set_text("No file selected")
             print(f"Updated context menu tooltip: {file_path}")  # Debugging
+            
+    def on_add_replace_artwork(self, menuitem):
+        file_path = self.get_selected_file()
+        if file_path:
+            folder_path = os.path.dirname(file_path)
+            image_path = os.path.join(folder_path, "image.jpg")
+            
+            # Open file chooser dialog to select an image
+            dialog = Gtk.FileChooserDialog(
+                title="Select an Image for Artwork",
+                parent=self,
+                action=Gtk.FileChooserAction.OPEN,
+            )
+            dialog.add_buttons(
+                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN, Gtk.ResponseType.OK,
+            )
+            dialog.set_filter(self._get_image_filter())
+            
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                selected_image_path = dialog.get_filename()
+                try:
+                    self._scale_and_save_image(selected_image_path, image_path)
+                    self.status_label.set_text(f"Artwork {'replaced' if os.path.isfile(image_path) else 'added'} successfully!")
+                    self.update_image_pane()  # Refresh the image pane
+                except Exception as e:
+                    print(f"Error adding/replacing artwork: {e}")
+                    self.status_label.set_text("Error: Unable to add/replace artwork.")
+            dialog.destroy()
+        else:
+            self.status_label.set_text("No file selected.")
+
+    def _get_image_filter(self):
+        image_filter = Gtk.FileFilter()
+        image_filter.set_name("Image Files")
+        image_filter.add_mime_type("image/jpeg")
+        image_filter.add_mime_type("image/png")
+        image_filter.add_pattern("*.jpg")
+        image_filter.add_pattern("*.jpeg")
+        image_filter.add_pattern("*.png")
+        return image_filter
+
+    def _scale_and_save_image(self, input_path, output_path, target_size=(300, 220)):
+        with Image.open(input_path) as img:
+            # Preserve aspect ratio while scaling
+            img.thumbnail(target_size, Image.ANTIALIAS)
+            img.save(output_path, format="JPEG", quality=90)
+
+    def on_csv(self, menuitem=None):
+        file_path = self.get_selected_file()
+        if file_path:
+            extension = os.path.splitext(file_path)[1].lower()
+            if extension in ['.mid', '.midi']:
+                # Generate the .csv file path
+                base_dir = os.path.dirname(file_path)
+                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                csv_file_path = os.path.join(base_dir, f"{base_name}.csv")
+                
+                try:
+                    # Run midicsv to convert the MIDI file to CSV
+                    subprocess.run(["midicsv", file_path, csv_file_path], check=True)
+                    print(f"Converted {file_path} to {csv_file_path}")
+                    self.status_label.set_text(f"Exported {csv_file_path}")
+                    
+                    # Open the folder containing the exported .csv
+                    if sys.platform == "win32":
+                        subprocess.run(["explorer", base_dir], check=True)
+                    elif sys.platform == "darwin":
+                        subprocess.run(["open", base_dir], check=True)
+                    else:
+                        subprocess.run(["xdg-open", base_dir], check=True)
+                except subprocess.CalledProcessError as e:
+                    print(f"Error converting to CSV: {e}")
+                    self.status_label.set_text("Error: Unable to convert MIDI to CSV")
+            else:
+                self.status_label.set_text("Selected file is not a MIDI file.")
+        else:
+            self.status_label.set_text("No file selected.")
         
+    def on_view_meta(self, menuitem=None):
+        file_path = self.get_selected_file()
+        if file_path:
+            extension = os.path.splitext(file_path)[1].lower()
+            if extension in ['.mod', '.xm', '.it', '.s3m']:  # Check for compatible file types
+                # Generate the .txt file path
+                base_dir = os.path.dirname(file_path)
+                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                txt_file_path = os.path.join(base_dir, f"{base_name}_metadata.txt")
+    
+                try:
+                    # Extract metadata using openmpt123
+                    openmpt_result = subprocess.run(
+                        ['openmpt123', '--info', file_path],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                    metadata = openmpt_result.stdout
+    
+                    # Save metadata to the .txt file
+                    with open(txt_file_path, 'w', encoding='utf-8') as f:
+                        f.write(metadata)
+    
+                    print(f"Metadata exported to {txt_file_path}")
+                    self.status_label.set_text(f"Metadata exported to {txt_file_path}")
+    
+                    # Open the folder containing the .txt file
+                    if sys.platform == "win32":
+                        subprocess.run(["explorer", base_dir], check=True)
+                    elif sys.platform == "darwin":
+                        subprocess.run(["open", base_dir], check=True)
+                    else:
+                        subprocess.run(["xdg-open", base_dir], check=True)
+                except subprocess.CalledProcessError as e:
+                    print(f"Error extracting metadata: {e}")
+                    self.status_label.set_text("Error: Unable to extract metadata.")
+            else:
+                self.status_label.set_text("Selected file is not compatible for metadata extraction.")
+        else:
+            self.status_label.set_text("No file selected.")
+
     def on_treeview_button_press(self, treeview, event):
         """Detects right-click on the file list and shows the context menu."""
         if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:  # Right-click
@@ -809,9 +1004,38 @@ class MidiSoundfontTester(Gtk.Window):
                 path, column, cell_x, cell_y = path_info
                 treeview.set_cursor(path, column, False)  # Select the right-clicked file
                 
-                # Update the tooltip with the full file path
+                # Get the selected file's path
                 file_path = self.get_selected_file()
+                if file_path:
+                    # Check the file extension for CSV export compatibility
+                    extension = os.path.splitext(file_path)[1].lower()
+                    self.csv_item.set_visible(extension in ['.mid', '.midi'])  # Show for MIDI files
+                    self.view_meta_item.set_visible(extension in ['.mod', '.xm', '.it', '.s3m'])  # Show for MOD files
+    
+                    # Check if image.jpg exists for Add/Replace Artwork
+                    folder_path = os.path.dirname(file_path)
+                    image_path = os.path.join(folder_path, "image.jpg")
+                    if os.path.isfile(image_path):
+                        self.add_replace_artwork_item.set_label("Replace Artwork...")
+                    else:
+                        self.add_replace_artwork_item.set_label("Add Artwork...")
+                    self.add_replace_artwork_item.set_visible(True)
+                else:
+                    # Hide items if no file is selected
+                    self.csv_item.set_visible(False)
+                    self.view_meta_item.set_visible(False)
+                    self.add_replace_artwork_item.set_visible(False)
+                
+                # Update the tooltip with the full file path
                 self.update_context_menu_tooltip(file_path)
+
+                # Update "Toggle Favourite" menu item label
+                file_path = self.get_selected_file()
+                if file_path:
+                    if file_path in self.favourites:
+                        self.toggle_favourite_item.set_label("Remove from Favourites")
+                    else:
+                        self.toggle_favourite_item.set_label("Add to Favourites")
                 
                 # Show the context menu
                 try:
@@ -831,7 +1055,31 @@ class MidiSoundfontTester(Gtk.Window):
                             )
                 return True
         return False
-    
+
+    def save_favourites(self):
+        try:
+            with open(self.favourites_file, "w", encoding="utf-8") as f:
+                for file_path in self.favourites:
+                    f.write(f"{file_path}\n")
+            print("Favourites saved successfully.")
+        except Exception as e:
+            print(f"Error saving favourites: {e}")
+
+    def load_favourites(self):
+        try:
+            if not os.path.isfile(self.favourites_file):
+                with open(self.favourites_file, "w", encoding="utf-8") as f:
+                    pass  # Create the file if it doesn't exist
+            
+            with open(self.favourites_file, "r", encoding="utf-8", errors="surrogateescape") as f:
+                self.favourites = set(
+                    os.path.normcase(os.path.abspath(line.strip().encode('utf-8', 'surrogateescape').decode('utf-8', 'replace')))
+                    for line in f if line.strip()
+                )
+            print(f"Loaded favourites: {self.favourites}")
+        except Exception as e:
+            print(f"Error loading favourites: {e}")
+        
     def on_open_file_location(self, menuitem):
         """Opens the containing folder of the selected file."""
         file_path = self.get_selected_file()
@@ -853,12 +1101,27 @@ class MidiSoundfontTester(Gtk.Window):
         if file_path:
             filename = os.path.splitext(os.path.basename(file_path))[0]  # Remove extension
             foldername = os.path.basename(os.path.dirname(file_path))
-            search_term = '+'.join((foldername + ' ' + filename).split())
-            search_url = f"https://www.google.com/search?sca_esv=null&q={search_term}+retro+game&udm=2&dpr=2.0"
+            search_term = '+'.join((foldername).split())
+            search_url = f"https://thegamesdb.net/search.php?name={search_term}"
             try:
                 webbrowser.open(search_url)
             except Exception as e:
                 print(f"Error opening browser: {e}")
+                
+    def on_fav(self, button):
+        # Check if the filter is already set to favourites
+        if self.search_entry.get_text() == "*":
+            # Clear the filter if already showing favourites
+            self.search_entry.set_text("")
+            self.status_label.set_text("Filter: None")
+        else:
+            # Set the filter to show favourites
+            self.search_entry.set_text("*")
+            self.status_label.set_text("Filter: Favourites")
+        
+        # Reapply the filter and update the UI
+        self.all_filter.refilter()
+        self.update_file_column_title()
 
     def on_radio(self, button):
         if not self.radio:
@@ -881,6 +1144,15 @@ class MidiSoundfontTester(Gtk.Window):
     
         if self.mplayer_process is None:
             try:
+                # Set the radio flag and stream title before starting the process
+                self.radio = True
+                self.save_button.set_visible(False)
+                self.stream_title = title if title else self.stream_title
+                self.status_label.set_tooltip_text(f"{self.stream_title}")
+    
+                # Update metadata immediately
+                self.update_metadata()  # Call directly instead of using GLib.idle_add
+    
                 # Start mplayer as a subprocess
                 self.mplayer_process = subprocess.Popen(
                     ['mplayer', stream_url],
@@ -890,9 +1162,6 @@ class MidiSoundfontTester(Gtk.Window):
                 self.status_label.set_text(f"Connecting to {stream_url}...")
                 print(f"Streaming {stream_url}...")
     
-                # Set the radio flag to True before starting the thread
-                self.radio = True
-    
                 # Start the thread to fetch current track
                 self.track_thread = threading.Thread(
                     target=self.fetch_current_track,
@@ -901,24 +1170,19 @@ class MidiSoundfontTester(Gtk.Window):
                 )
                 self.track_thread.start()
     
-                # Manually set the stream title
-                self.stream_title = title
-                self.status_label.set_tooltip_text(f"{self.streams[self.current_stream_index]['title']}")
-                GLib.idle_add(self.update_metadata)  # Update metadata in the main thread
-    
             except FileNotFoundError:
                 print("mplayer not found. Please install mplayer and try again.")
                 self.radio = False
-                # Update the UI safely
-                GLib.idle_add(self.status_label.set_text, "mplayer not found.")
+                self.save_button.set_visible(True)
+                self.status_label.set_text("mplayer not found.")
             except Exception as e:
                 print(f"Failed to start mplayer: {e}")
                 self.radio = False
-                # Update the UI safely
-                GLib.idle_add(self.status_label.set_text, "Failed to start streaming.")
+                self.save_button.set_visible(True)
+                self.status_label.set_text("Failed to start streaming.")
         else:
             print("mplayer is already running.")
-            GLib.idle_add(self.status_label.set_text, "Streaming already in progress.")
+            self.status_label.set_text("Streaming already in progress.")
 
     def fetch_current_track(self, url):
         headers = {
@@ -976,6 +1240,7 @@ class MidiSoundfontTester(Gtk.Window):
     def stop_stream(self):
         self.spinner.stop()
         self.radio = False
+        self.save_button.set_visible(True)
         if self.mplayer_process:
             try:
                 # Terminate the mplayer process
@@ -996,13 +1261,6 @@ class MidiSoundfontTester(Gtk.Window):
         if hasattr(self, 'track_thread') and self.track_thread.is_alive():
             self.track_thread.join(timeout=1)
 
-    def on_destroy(self, widget):
-        self.stop_stream()
-        Gtk.main_quit()
-
-    def start_spinner(self):
-        """Method to start the spinner."""
-        self.spinner.start()
 
     def stop_spinner(self):
         """Method to stop the spinner."""
@@ -1055,15 +1313,12 @@ class MidiSoundfontTester(Gtk.Window):
         try:
             for root, dirs, files in os.walk(self.source_dir):
                 for file in files:
-                    if file.lower().endswith((
-                        '.mid', '.midi', '.mod', '.xm', '.it', '.s3m', '.stm', '.imf', '.ptm', '.mdl', '.ult',
-                        '.liq', '.masi', '.j2b', '.amf', '.med', '.rts', '.digi', '.sym', '.dbm', '.qc', '.okt',
-                        '.sfx', '.far', '.umx', '.hmn', '.slt', '.coco', '.ims', '.669', '.abk', '.uni', '.gmc'
-                    )):
-                        all_files.append(os.path.join(root, file))
+                    if file.lower().endswith(('.mid', '.midi', '.mod', '.xm', '.it', '.s3m')):
+                        full_path = os.path.normcase(os.path.abspath(os.path.join(root, file)))
+                        all_files.append(full_path)
         except Exception as e:
             print(f"Error finding all files: {e}")
-        return all_files  # Ensure this always returns a list
+        return all_files
 
     def find_sf2_files(self):
         sf2_files = []
@@ -1074,11 +1329,21 @@ class MidiSoundfontTester(Gtk.Window):
         return sf2_files
 
     def load_all_files(self):
-        # Step 1: Start the spinner on the main thread
-        GLib.idle_add(self.spinner.start)
-    
-        # Step 2: Create a background thread for loading and preparing files
-        threading.Thread(target=self._load_all_files_background).start()
+        self.all_store.clear()
+        for all_file in self.all_files:
+            try:
+                # Safely encode and decode the file path for output
+                safe_file = all_file.encode('utf-8', 'surrogateescape').decode('utf-8', 'replace')
+                
+                # Check if the file is in favourites
+                if os.path.normcase(os.path.abspath(all_file)) in self.favourites:
+                    print(f"Matched favourite: {safe_file}")
+                
+                self.append_file_to_store(all_file)
+            except Exception as e:
+                print(f"Error processing file: {all_file} - {e}")
+        self.all_filter.refilter()
+        self.update_file_column_title()
 
     def _load_all_files_background(self):
         # Stop any running processes in the background thread
@@ -1104,32 +1369,31 @@ class MidiSoundfontTester(Gtk.Window):
         GLib.idle_add(self.select_current_file_in_treeview)
         GLib.idle_add(self.spinner.stop)
     
-    def _load_files_into_store(self, files):
-        if not files:  # Check if files is None or empty
-            self.status_label.set_text(f"No files to load.")
-            return
-    
-        # Disable updates to the UI while adding files
-        self.all_store.freeze_notify()
+    def append_file_to_store(self, all_file):
         try:
-            for all_file in files:
-                self.append_file_to_store(all_file)
-        finally:
-            # Re-enable UI updates
-            self.all_store.thaw_notify()
-    
-        # Update status and UI after all files are added
-        self.status_label.set_text(f"Loaded {len(files)} files")
+            # Safely decode the file path for comparison and display
+            safe_file = all_file.encode('utf-8', 'surrogateescape').decode('utf-8', 'replace')
+            basename = os.path.basename(safe_file)
+            foldername = os.path.basename(os.path.dirname(safe_file))
+            
+            # Check if the file is a favorite
+            if os.path.normcase(os.path.abspath(all_file)) in self.favourites:
+                print(f"Matched favourite: {safe_file}")
+                display_name = f"*{basename}"
+            else:
+                display_name = basename
+            
+            self.all_store.append([display_name, foldername, all_file])
+        except Exception as e:
+            print(f"Error appending file: {all_file} - {e}")
+
+    def update_favourites_in_listview(self):
+        # Refresh the TreeView display
+        self.all_store.clear()
+        for file_path in self.all_files:
+            self.append_file_to_store(file_path)
         self.all_filter.refilter()
         self.update_file_column_title()
-        self.select_current_file_in_treeview()
-        self.update_metadata()
-
-    def append_file_to_store(self, all_file):
-        basename = os.path.basename(all_file)
-        foldername = os.path.basename(os.path.dirname(all_file))
-        # Store the data directly
-        self.all_store.append([basename, foldername, all_file])
 
     def load_sf2_files(self):
         self.sf2_store.clear()
@@ -1256,55 +1520,63 @@ class MidiSoundfontTester(Gtk.Window):
         self.on_play(None)
 
     def update_metadata(self):
-        file_path = self.get_selected_file()
-        if file_path:
-            metadata = self.extract_metadata(file_path)
-            buffer = self.metadata_view.get_buffer()
+        if self.radio:
+            metadata = self.extract_metadata(None)
+        else:
+            file_path = self.get_selected_file()
+            if file_path:
+                metadata = self.extract_metadata(file_path)
+            else:
+                # Clear the metadata pane if no file is selected and radio is not playing
+                buffer = self.metadata_view.get_buffer()
+                buffer.set_text("")
+                return
     
-            # Clear the buffer
-            buffer.set_text("")
+        buffer = self.metadata_view.get_buffer()
+        # Clear the buffer
+        buffer.set_text("")
     
-            # Ensure the 'link' tag exists and is connected to the event signal
-            tag_table = buffer.get_tag_table()
-            link_tag = tag_table.lookup("link")
-            if not link_tag:
-                link_tag = buffer.create_tag(
-                    "link",
-                    foreground="#5275ba",
-                    underline=Pango.Underline.SINGLE
-                )
-                link_tag.connect("event", self.on_link_clicked)
+        # Ensure the 'link' tag exists and is connected to the event signal
+        tag_table = buffer.get_tag_table()
+        link_tag = tag_table.lookup("link")
+        if not link_tag:
+            link_tag = buffer.create_tag(
+                "link",
+                foreground="#5275ba",
+                underline=Pango.Underline.SINGLE
+            )
+            link_tag.connect("event", self.on_link_clicked)
     
-            # Regex to detect URLs and email addresses
-            url_regex = re.compile(r'(https?://[^\s]+)')
-            email_regex = re.compile(r'[\w.-]+@[\w.-]+\.\w+')
+        # Regex to detect URLs and email addresses
+        url_regex = re.compile(r'(https?://[^\s]+)')
+        email_regex = re.compile(r'[\w.-]+@[\w.-]+\.\w+')
     
-            # Insert metadata into the buffer, formatting URLs and emails as links
-            start_iter = buffer.get_start_iter()
-            for line in metadata.splitlines():
-                url_matches = list(url_regex.finditer(line))
-                email_matches = list(email_regex.finditer(line))
+        # Insert metadata into the buffer, formatting URLs and emails as links
+        start_iter = buffer.get_start_iter()
+        for line in metadata.splitlines():
+            url_matches = list(url_regex.finditer(line))
+            email_matches = list(email_regex.finditer(line))
     
-                if not url_matches and not email_matches:
-                    # Insert line without links
-                    buffer.insert(start_iter, line + "\n")
-                    continue
+            if not url_matches and not email_matches:
+                # Insert line without links
+                buffer.insert(start_iter, line + "\n")
+                continue
     
-                # Insert line with links
-                pos = 0
-                for match in sorted(url_matches + email_matches, key=lambda m: m.start()):
-                    start, end = match.start(), match.end()
-                    # Insert text before the match
-                    if pos < start:
-                        buffer.insert(start_iter, line[pos:start])
-                    # Insert the match as a link
-                    link_text = line[start:end]
-                    buffer.insert_with_tags_by_name(start_iter, link_text, "link")
-                    pos = end
-                # Insert the rest of the line
-                if pos < len(line):
-                    buffer.insert(start_iter, line[pos:])
-                buffer.insert(start_iter, "\n")
+            # Insert line with links
+            pos = 0
+            for match in sorted(url_matches + email_matches, key=lambda m: m.start()):
+                start, end = match.start(), match.end()
+                # Insert text before the match
+                if pos < start:
+                    buffer.insert(start_iter, line[pos:start])
+                # Insert the match as a link
+                link_text = line[start:end]
+                buffer.insert_with_tags_by_name(start_iter, link_text, "link")
+                pos = end
+            # Insert the rest of the line
+            if pos < len(line):
+                buffer.insert(start_iter, line[pos:])
+            buffer.insert(start_iter, "\n")
     
     def on_link_clicked(self, tag, widget, event, iter):
         if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 1:  # Left-click
@@ -1449,32 +1721,43 @@ class MidiSoundfontTester(Gtk.Window):
         self.stop_stream()
         file_path = self.get_selected_file()
         if file_path:
+            self.total_length = None  # Initialize total length
+            self.play_start_time = time.time()  # Record start time
+    
             extension = os.path.splitext(file_path)[1].lower()
             if extension in ['.mid', '.midi']:
                 # Use fluidsynth to play MIDI files
                 sf2_file = self.get_selected_sf2()
                 if sf2_file:
                     try:
+                        self.fluidsynth_stopped_intentionally = False
+                        # Calculate total length of MIDI file
+                        self.total_length = self.get_midi_length(file_path)
                         self.fluidsynth_process = subprocess.Popen(
                             ["fluidsynth", "-g", "1.3", "-a", "pulseaudio", "-m", "alsa_seq", "-i", sf2_file, file_path],
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL,
                             text=True,
                         )
                         threading.Thread(target=self.monitor_fluidsynth_output, daemon=True).start()
-                        self.status_label.set_text(f"Playing: {file_path} + {os.path.basename(sf2_file)}")
+                        self.status_label.set_text(f"Playing: {os.path.basename(file_path)} + {os.path.basename(sf2_file)}")
                         self.status_label.set_tooltip_text(f"{file_path} + {os.path.basename(sf2_file)}")
                         if self.image_viewer:  # Update image pane only if enabled
                             self.update_image_pane()
+                        # Start the timer to update playback progress
+                        if self.total_length:
+                            self.elapsed_timer = GLib.timeout_add(1000, self.update_playback_progress)
+                            self.update_playback_progress()  # Update immediately
                     except Exception as e:
                         print(f"Failed to start fluidsynth: {e}")
                         self.fluidsynth_process = None
-                        # self.status_label.set_text("Error: Unable to play")
                 else:
                     self.status_label.set_text("No SoundFont selected")
             else:
                 # Use xmp to play other files
                 try:
+                    # Calculate total length of module file
+                    self.total_length = self.get_module_length(file_path)
                     self.xmp_stopped_intentionally = False  # Reset the flag
                     self.xmp_process = subprocess.Popen(
                         ["xmp", file_path],
@@ -1484,83 +1767,82 @@ class MidiSoundfontTester(Gtk.Window):
                     )
                     threading.Thread(target=self.monitor_xmp_output, daemon=True).start()
                     # Update status label
-                    self.status_label.set_text(f"Playing: {file_path}")
+                    self.status_label.set_text(f"Playing: {os.path.basename(file_path)}")
                     if self.image_viewer:  # Update image pane only if enabled
-                            self.update_image_pane()
+                        self.update_image_pane()
+                    # Start the timer to update playback progress
+                    if self.total_length:
+                        self.elapsed_timer = GLib.timeout_add(1000, self.update_playback_progress)
+                        self.update_playback_progress()  # Update immediately
                 except Exception as e:
                     print(f"Failed to start xmp: {e}")
                     self.xmp_process = None
                     self.status_label.set_text("Error: Unable to play")
+            self.metadata_view.set_editable(False)  # Make it read-only
+            self.metadata_view.set_cursor_visible(True)  # Allow cursor interaction
+            self.update_metadata()
         else:
             self.status_label.set_text("No file selected")
-        self.metadata_view.set_editable(False)  # Make it read-only
-        self.metadata_view.set_cursor_visible(True)  # Allow cursor interaction
-        self.update_metadata()
 
-    def monitor_xmp_output(self):
-        process = self.xmp_process
-        if process:
-            try:
-                # Wait for the process to complete
-                process.wait()
-
-                if process.returncode != 0:
-                    if self.xmp_stopped_intentionally:
-                        self.xmp_stopped_intentionally = False  # Reset the flag
-                        # Do not report an error
-                    else:
-                        print(f"xmp exited with code {process.returncode}")
-                        GLib.idle_add(self.handle_xmp_error)
-                else:
-                    # After playback is done, move to next track
-                    GLib.idle_add(self.on_next_auto)
-            except Exception as e:
-                print(f"Error in monitor_xmp_output: {e}")
-                GLib.idle_add(self.handle_xmp_error)
-        else:
-            print("xmp_process is None in monitor_xmp_output")
-
+    def handle_fluidsynth_error(self):
+        """Handles errors from the Fluidsynth process."""
+        self.status_label.set_text("Error: fluidsynth failed to play the file.")
+    
     def handle_xmp_error(self):
+        """Handles errors from the xmp process."""
         self.status_label.set_text("Error: xmp failed to play the file.")
 
     def monitor_fluidsynth_output(self):
         process = self.fluidsynth_process
         if process:
+            self.spinner.start()
+            stderr_output = ''
             try:
-                # Read Fluidsynth's stderr output
-                while True:
-                    line = process.stderr.readline()
-                    if not line:
-                        break
-                    line = line.strip()
-                    
-                    # Filter out all output, including specific warnings
-                    if "Failed to set thread to high priority" in line:
-                        continue
-                    if "Using PulseAudio driver" in line:
-                        continue
-                    if "code 15" in line:
-                        continue  # Skip any "code 15" errors
+                # Wait for the process to finish and capture stderr
+                _, stderr_output = process.communicate()
     
-                # Wait for the process to complete and check return code
-                process.wait()
-                if process.returncode != 0:
-                    # Handle error condition in the UI
-                    GLib.idle_add(self.handle_fluidsynth_error)
+                exit_code = process.returncode
+                print(f"Fluidsynth exited with code {exit_code}")
+                print(f"Fluidsynth stderr output:\n{stderr_output}")
+    
+                if exit_code != 0:
+                    if self.fluidsynth_stopped_intentionally or exit_code == -15:
+                        self.fluidsynth_stopped_intentionally = False  # Reset the flag
+                    else:
+                        # Check for actual error messages
+                        if 'error' in stderr_output.lower():
+                            GLib.idle_add(self.handle_fluidsynth_error)
+                        else:
+                            # No actual error, treat as normal termination
+                            GLib.idle_add(self.stop_playback_timer)
+                            GLib.idle_add(self.on_next_auto)
                 else:
-                    # After playback is complete, move to the next track
+                    GLib.idle_add(self.stop_playback_timer)
                     GLib.idle_add(self.on_next_auto)
-                    
             except Exception as e:
-                # Only output detailed exception handling
-                print(f"Error in monitor_fluidsynth_output: {type(e).__name__}: {e}")
+                print(f"Exception in monitor_fluidsynth_output: {e}")
                 GLib.idle_add(self.handle_fluidsynth_error)
         else:
-            # Detailed exception handling if the process is None
-            print("Error: fluidsynth_process is None in monitor_fluidsynth_output")
-
-    def handle_fluidsynth_error(self):
-        self.status_label.set_text("Error: fluidsynth failed to play the file.")
+            self.spinner.stop()
+    
+    def monitor_xmp_output(self):
+        process = self.xmp_process
+        if process:
+            self.spinner.start()
+            try:
+                process.wait()
+                if process.returncode != 0:
+                    if self.xmp_stopped_intentionally:
+                        self.xmp_stopped_intentionally = False
+                    else:
+                        GLib.idle_add(self.handle_xmp_error)
+                else:
+                    GLib.idle_add(self.stop_playback_timer)
+                    GLib.idle_add(self.on_next_auto)
+            except Exception as e:
+                GLib.idle_add(self.handle_xmp_error)
+        else:
+            self.spinner.stop()
 
     def select_current_file_in_treeview(self):
         # Select the first item in the filtered model
@@ -1582,28 +1864,40 @@ class MidiSoundfontTester(Gtk.Window):
         self.status_label.set_tooltip_text("")
 
     def on_previous(self, button):
+        # Stop any active streams or playback
         self.stop_stream()
         self.stop_fluidsynth()
         self.stop_xmp()
+        
+        def scroll_to_path(path):
+            if path:
+                column = self.all_treeview.get_column(0)
+                self.all_treeview.set_cursor(path, column, False)  # Set the cursor
+                self.all_treeview.scroll_to_cell(path, column, True, 0.5, 0.0)  # Scroll to the cell
+                self.all_treeview.queue_draw()  # Force a redraw after scrolling
+                scrolled_window = self.all_treeview.get_parent()
+                if isinstance(scrolled_window, Gtk.ScrolledWindow):
+                    scrolled_window.queue_draw()  # Ensure the scrolled window updates its state
     
-        # Get all rows in the filter
-        iter_list = []
-        iter = self.all_filter.get_iter_first()
-        while iter:
-            iter_list.append(iter)
-            iter = self.all_filter.iter_next(iter_list[-1])
-    
-        if self.shuffle_mode and iter_list:
-            # Select a random row
-            random_iter = random.choice(iter_list)
-            path = self.all_filter.get_path(random_iter)
-            self.all_treeview.set_cursor(path)
-            self.all_treeview.scroll_to_cell(path, None, True, 0.5, 0.5)
+        # Determine the previous path
+        if self.shuffle_mode:
+            # Shuffle mode: Pick a random visible row
+            iter_list = []
+            iter = self.all_filter.get_iter_first()
+            while iter:
+                iter_list.append(iter)
+                iter = self.all_filter.iter_next(iter)
+            
+            if iter_list:
+                random_iter = random.choice(iter_list)
+                path = self.all_filter.get_path(random_iter)
+            else:
+                path = None
         else:
-            # Normal previous behaviour
+            # Sequential mode: Move to the previous visible row
             selection = self.all_treeview.get_selection()
             model, treeiter = selection.get_selected()
-    
+            
             if treeiter:
                 path = model.get_path(treeiter)
                 index = path.get_indices()[0]
@@ -1613,18 +1907,23 @@ class MidiSoundfontTester(Gtk.Window):
                     # Loop back to the last item
                     total_rows = self.get_filtered_file_count()
                     prev_path = Gtk.TreePath(total_rows - 1)
-                self.all_treeview.set_cursor(prev_path)
-                self.all_treeview.scroll_to_cell(prev_path, None, True, 0.5, 0.5)
+                path = prev_path
             else:
                 # No selection, select the last item
                 total_rows = self.get_filtered_file_count()
                 if total_rows > 0:
-                    prev_path = Gtk.TreePath(total_rows - 1)
-                    self.all_treeview.set_cursor(prev_path)
-                    self.all_treeview.scroll_to_cell(prev_path, None, True, 0.5, 0.5)
+                    path = Gtk.TreePath(total_rows - 1)
+                else:
+                    path = None
     
+        # Ensure the tree view updates to the selected path
+        if path:
+            scroll_to_path(path)
+        else:
+            self.all_treeview.get_selection().unselect_all()
+    
+        # Update metadata and play the file
         self.update_metadata()
-        self.update_file_column_title()
         self.on_play(None)
 
     def get_tree_path_for_file(self, file_path):
@@ -1782,6 +2081,7 @@ class MidiSoundfontTester(Gtk.Window):
 
     def stop_fluidsynth(self):
         if self.fluidsynth_process:
+            self.fluidsynth_stopped_intentionally = True  # Set the flag
             self.fluidsynth_process.terminate()
             try:
                 self.fluidsynth_process.wait(timeout=2)
@@ -1789,10 +2089,14 @@ class MidiSoundfontTester(Gtk.Window):
                 self.fluidsynth_process.kill()
             self.fluidsynth_process = None
             self.status_label.set_text("Playback Stopped")
-
+        if self.elapsed_timer:
+            GLib.source_remove(self.elapsed_timer)
+            self.elapsed_timer = None
+        self.playback_label.set_text("00:00 / 00:00")  # Reset the playback label
+    
     def stop_xmp(self):
         if self.xmp_process:
-            self.xmp_stopped_intentionally = True  # Set the flag
+            self.xmp_stopped_intentionally = True
             self.xmp_process.terminate()
             try:
                 self.xmp_process.wait(timeout=2)
@@ -1800,6 +2104,10 @@ class MidiSoundfontTester(Gtk.Window):
                 self.xmp_process.kill()
             self.xmp_process = None
             self.status_label.set_text("Playback Stopped")
+        if self.elapsed_timer:
+            GLib.source_remove(self.elapsed_timer)
+            self.elapsed_timer = None
+        self.playback_label.set_text("00:00 / 00:00")  # Reset the playback label
 
     def on_select_source_directory(self, menuitem):
         dialog = Gtk.FileChooserDialog(
@@ -1817,6 +2125,26 @@ class MidiSoundfontTester(Gtk.Window):
             self.spinner.start()
             threading.Thread(target=self._load_files_from_new_directory).start()
         dialog.destroy()
+
+    def on_select_output_source(self, menuitem):
+        # Determine the output directory path relative to the root program directory
+        output_dir = os.path.join(os.getcwd(), "Output")
+    
+        # Create the directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+    
+        try:
+            # Open the directory in the file manager
+            if sys.platform == "win32":
+                subprocess.run(["explorer", output_dir], check=True)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", output_dir], check=True)
+            else:
+                subprocess.run(["xdg-open", output_dir], check=True)
+            self.status_label.set_text(f"Opened output directory: {output_dir}")
+        except Exception as e:
+            print(f"Error opening output directory: {e}")
+            self.status_label.set_text("Error: Unable to open output directory")
     
     def _load_files_from_new_directory(self):
         try:
@@ -2035,19 +2363,6 @@ class MidiSoundfontTester(Gtk.Window):
         self.update_file_column_title()
         self.spinner.stop()
 
-    def handle_fluidsynth_error(self):
-        error=1
-        # self.status_label.set_text("Error: fluidsynth failed to play the file.")
-
-    def handle_xmp_error(self):
-        self.status_label.set_text("Error: xmp failed to play the file.")
-
-    def append_file_to_store(self, all_file):
-        basename = os.path.basename(all_file)
-        foldername = os.path.basename(os.path.dirname(all_file))
-        # Store the data directly
-        self.all_store.append([basename, foldername, all_file])
-
     def on_next_auto(self):
         self.stop_fluidsynth()
         self.stop_xmp()
@@ -2098,6 +2413,70 @@ class MidiSoundfontTester(Gtk.Window):
         # Update metadata and play the file
         self.update_metadata()
         self.on_play(None)
+
+    def get_midi_length(self, file_path):
+        try:
+            mid = mido.MidiFile(file_path)
+            if mid.type == 2:
+                print("Type 2 MIDI files cannot have their length computed.")
+                return None
+            total_time = mid.length
+            return total_time
+        except TypeError as e:
+            print(f"Unable to compute MIDI length due to TypeError: {e}")
+            return None
+        except Exception as e:
+            print(f"Unable to compute MIDI length: {e}")
+            return None
+    
+    def get_module_length(self, file_path):
+        try:
+            result = subprocess.run(
+                ['openmpt123', '--info', file_path],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                output = result.stdout
+                for line in output.splitlines():
+                    if line.startswith('Duration'):
+                        duration_str = line.split(':', 1)[1].strip()
+                        # Convert duration string to seconds
+                        parts = duration_str.split(':')
+                        parts = [float(p) for p in parts]
+                        duration_seconds = sum(t * 60 ** (len(parts) - i - 1) for i, t in enumerate(parts))
+                        return duration_seconds
+            return None
+        except Exception as e:
+            print(f"Error getting module length: {e}")
+            return None
+
+    def stop_playback_timer(self):
+        if self.elapsed_timer:
+            GLib.source_remove(self.elapsed_timer)
+            self.elapsed_timer = None
+        self.playback_label.set_text("00:00 / 00:00")  # Reset the playback label
+
+    def update_playback_progress(self):
+        if self.play_start_time:
+            elapsed_time = time.time() - self.play_start_time
+            elapsed_str = self.format_time(elapsed_time)
+            if self.total_length:
+                total_str = self.format_time(self.total_length)
+                self.playback_label.set_text(f"{elapsed_str} / {total_str}")
+            else:
+                self.playback_label.set_text(f"{elapsed_str} / --:--")
+            return True
+        else:
+            return False
+        
+    def format_time(self, seconds):
+        mins, secs = divmod(int(seconds), 60)
+        hours, mins = divmod(mins, 60)
+        if hours > 0:
+            return f"{hours}:{mins:02d}:{secs:02d}"
+        else:
+            return f"{mins}:{secs:02d}"
 
 if __name__ == "__main__":
     app = MidiSoundfontTester()

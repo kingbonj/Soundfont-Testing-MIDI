@@ -13,6 +13,7 @@ import requests
 import re
 import webbrowser
 import gi
+import io
 from PIL import Image, ImageDraw
 import base64
 import traceback
@@ -168,6 +169,120 @@ class MidiSoundfontTester(Gtk.Window):
         # Handle close event
         self.connect("destroy", self.on_quit)
 
+        # Connect key-press-event to the window
+        self.connect("key-press-event", self.on_key_press_event)
+        self.set_focus(self.all_treeview)
+
+    def on_key_press_event(self, widget, event):
+
+        focused_widget = self.get_focus()
+    
+        # If the focused widget is a Gtk.Entry or Gtk.TextView, do not handle the key press
+        if isinstance(focused_widget, (Gtk.Entry, Gtk.TextView)):
+            return False  # Allow the event to propagate and be handled by the text widget
+
+        # Check for left arrow key
+        if event.keyval == Gdk.KEY_Left:
+            self.on_previous(None)
+            return True  # Event has been handled
+    
+        # Check for right arrow key
+        elif event.keyval == Gdk.KEY_Right:
+            self.on_next(None)
+            return True  # Event has been handled
+    
+        # Check for space bar
+        elif event.keyval == Gdk.KEY_space:
+            self.toggle_play_pause()
+            return True  # Event has been handled
+    
+        # Check for up arrow key
+        elif event.keyval == Gdk.KEY_Up:
+            self.set_focus(self.sf2_treeview)
+            self.select_previous_soundfont()
+            return True  # Event has been handled
+    
+        # Check for down arrow key
+        elif event.keyval == Gdk.KEY_Down:
+            self.set_focus(self.sf2_treeview)
+            self.select_next_soundfont()
+            return True  # Event has been handled
+
+            # Check for 'i' key (both lowercase and uppercase if needed)
+        elif event.keyval == Gdk.KEY_i or event.keyval == Gdk.KEY_I:
+            self.toggle_image_viewer()
+            return True  # Event has been handled
+    
+        # For other keys, do not block the event
+        return False
+
+    def is_playing(self):
+        # Check if either fluidsynth_process or xmp_process is running
+        return self.fluidsynth_process is not None or self.xmp_process is not None or self.radio
+
+    def toggle_play_pause(self):
+        if self.is_playing():
+            self.on_pause(None)
+        else:
+            self.on_play(None)
+            
+    def select_previous_soundfont(self):
+        selection = self.sf2_treeview.get_selection()
+        model, treeiter = selection.get_selected()
+    
+        if treeiter:
+            path = model.get_path(treeiter)
+            index = path.get_indices()[0]
+            if index > 0:
+                new_index = index - 1
+            else:
+                new_index = len(model) - 1  # Wrap around to last item
+    
+            new_path = Gtk.TreePath(new_index)
+            self.sf2_treeview.set_cursor(new_path)
+            self.sf2_treeview.scroll_to_cell(new_path)
+            self.on_play(None)
+    
+            # Update status label
+            sf2_file = self.get_selected_sf2()
+            if sf2_file:
+                self.status_label.set_text(f"Selected SoundFont: {os.path.basename(sf2_file)}")
+        else:
+            # No selection, select the last item
+            last_index = len(model) - 1
+            new_path = Gtk.TreePath(last_index)
+            self.sf2_treeview.set_cursor(new_path)
+            self.sf2_treeview.scroll_to_cell(new_path)
+            self.on_play(None)
+
+    def select_next_soundfont(self):
+        selection = self.sf2_treeview.get_selection()
+        model, treeiter = selection.get_selected()
+    
+        if treeiter:
+            path = model.get_path(treeiter)
+            index = path.get_indices()[0]
+            if index < len(model) - 1:
+                new_index = index + 1
+            else:
+                new_index = 0  # Wrap around to first item
+    
+            new_path = Gtk.TreePath(new_index)
+            self.sf2_treeview.set_cursor(new_path)
+            self.sf2_treeview.scroll_to_cell(new_path)
+            self.on_play(None)
+    
+            # Update status label
+            sf2_file = self.get_selected_sf2()
+            if sf2_file:
+                self.status_label.set_text(f"Selected SoundFont: {os.path.basename(sf2_file)}")
+        else:
+            # No selection, select the first item
+            new_path = Gtk.TreePath(0)
+            self.sf2_treeview.set_cursor(new_path)
+            self.sf2_treeview.scroll_to_cell(new_path)
+            self.on_play(None)
+
     def check_requirements(self):
         missing = []
         for cmd in self.required_commands:
@@ -254,6 +369,27 @@ class MidiSoundfontTester(Gtk.Window):
         view_menu = Gtk.Menu()
         view_item = Gtk.MenuItem(label="View")
         view_item.set_submenu(view_menu)  # Associate the Settings menu with the Settings item
+
+        # Theme submenu
+        theme_menu = Gtk.Menu()
+        theme_item = Gtk.MenuItem(label="🎨 Theme...")
+        theme_item.set_submenu(theme_menu)
+        view_menu.append(theme_item)
+    
+        # MS-DOS theme menu item
+        msdos_theme_item = Gtk.MenuItem(label="MS-DOS")
+        msdos_theme_item.connect("activate", self.on_msdos_theme_selected)
+        theme_menu.append(msdos_theme_item)
+        hax0r_theme_item = Gtk.MenuItem(label="L33t Hax0r")
+        hax0r_theme_item.connect("activate", self.on_hax0r_theme_selected)
+        theme_menu.append(hax0r_theme_item)
+        deus_ex_amber_theme_item = Gtk.MenuItem(label="Deus Ex Amber")
+        deus_ex_amber_theme_item.connect("activate", self.on_deus_ex_amber_theme_selected)
+        theme_menu.append(deus_ex_amber_theme_item)
+        # Add Chiptune Blue Theme option
+        chiptune_theme_item = Gtk.MenuItem(label="Chiptune Blue")
+        chiptune_theme_item.connect("activate", self.on_chiptune_blue_theme_selected)
+        theme_menu.append(chiptune_theme_item)
 
          # Create Image Viewer menu item
         self.image_viewer_menuitem = Gtk.CheckMenuItem(label="🖻 Image Viewer")
@@ -452,7 +588,7 @@ class MidiSoundfontTester(Gtk.Window):
         
         self.metadata_view = Gtk.TextView()
         self.metadata_view.set_editable(False)
-        self.metadata_view.set_cursor_visible(False)
+        self.metadata_view.set_cursor_visible(True)
         self.metadata_view.set_wrap_mode(Pango.WrapMode.WORD)
         self.apply_monospace_font(self.metadata_view)
         scrolled_window_metadata = Gtk.ScrolledWindow()
@@ -581,6 +717,245 @@ class MidiSoundfontTester(Gtk.Window):
             filename = ''
         cell.set_property('text', filename)
 
+    def on_chiptune_blue_theme_selected(self, menuitem):
+        try:
+            # Load the custom font
+            font_path = os.path.join(os.getcwd(), "DOS.ttf")
+            if not os.path.isfile(font_path):
+                self.status_label.set_text("Error: Chiptune.ttf not found.")
+                return
+    
+            # Load the custom font using Fontconfig
+            import subprocess
+            font_dir = os.path.join(tempfile.gettempdir(), "custom_fonts")
+            os.makedirs(font_dir, exist_ok=True)
+            shutil.copy(font_path, font_dir)
+            subprocess.run(["fc-cache", "-f", "-v", font_dir], check=True)
+    
+            # Use the font family name defined in Chiptune.ttf
+            font_family = "Chiptune"  # Replace with the actual font family name in the TTF file
+    
+            # Custom CSS for Chiptune Blue theme
+            css = f"""
+            * {{
+                font-family: "{font_family}", Monospace;
+                font-size: 14px;
+                font-weight: bold;
+                background-color: #000088;
+                color: #FFFF00;  /* Cyan text */
+            }}
+            #path_label {{
+                color: #FF0000;  /* Cyan text for tooltips */
+            }}
+            #image_viewer_container {{
+                background-color: #000088; /* Deep blue background for image viewer */
+            }}
+            GtkTreeView {{
+                background-color: #000088;
+                color: #00FFFF;
+            }}
+            GtkTreeView:selected {{
+                background-color: #FFFFFF;  /* Highlight with brighter blue */
+                color: #FFFFFF;
+            }}
+            GtkTreeView * {{
+                background-color: transparent;  /* Prevent black panes */
+            }}
+            """
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_data(css.encode("utf-8"))
+    
+            # Apply CSS globally
+            Gtk.StyleContext.add_provider_for_screen(
+                Gdk.Screen.get_default(),
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+    
+            # Update status label to confirm theme change
+            self.status_label.set_text("Chiptune Blue Theme Applied")
+        except subprocess.CalledProcessError as e:
+            print(f"Fontconfig error: {e}")
+            self.status_label.set_text("Error: Unable to apply Chiptune Blue theme (Fontconfig issue).")
+        except Exception as e:
+            print(f"Error applying Chiptune Blue theme: {e}")
+            self.status_label.set_text("Error: Unable to apply Chiptune Blue theme.")
+
+    def on_msdos_theme_selected(self, menuitem):
+        try:
+            # Define the path to the custom font file
+            font_path = os.path.join(os.getcwd(), "DOS.ttf")
+            if not os.path.isfile(font_path):
+                self.status_label.set_text("Error: DOS.ttf not found.")
+                return
+    
+            # Load the custom font using Fontconfig
+            import subprocess
+            font_dir = os.path.join(tempfile.gettempdir(), "custom_fonts")
+            os.makedirs(font_dir, exist_ok=True)
+            shutil.copy(font_path, font_dir)
+    
+            # Update Fontconfig to include the temporary directory
+            subprocess.run(["fc-cache", "-f", "-v", font_dir], check=True)
+    
+            # Use the font family name defined in DOS.ttf
+            font_family = "DOS"  # Replace with the actual font family name in the TTF file
+    
+            # Custom CSS for MS-DOS theme
+            css = f"""
+            * {{
+                font-family: "{font_family}", Monospace;
+                font-size: 14px;
+                font-weight: bold;
+                background-color: #000000;
+                color: #8e8e8e;
+            }}
+            #path_label {{
+                color: #8e8e8e;  /* Grey text for tooltips */
+            }}
+            #image_viewer_container {{
+                background-color: #000000; /* Black background for image viewer */
+            }}
+            GtkTreeView {{
+                background-color: #000000;
+                color: #8e8e8e;
+            }}
+            GtkTreeView:selected {{
+                background-color: #444444;
+                color: #ffffff;
+            }}
+            GtkTreeView * {{
+                background-color: transparent;  /* Prevent black panes */
+            }}
+            """
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_data(css.encode("utf-8"))
+    
+            # Apply CSS globally
+            Gtk.StyleContext.add_provider_for_screen(
+                Gdk.Screen.get_default(),
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+    
+            # Update the status label to confirm theme change
+            self.status_label.set_text("MS-DOS Theme Applied (Bold)")
+        except subprocess.CalledProcessError as e:
+            print(f"Fontconfig error: {e}")
+            self.status_label.set_text("Error: Unable to apply MS-DOS theme (Fontconfig issue).")
+        except Exception as e:
+            print(f"Error applying MS-DOS theme: {e}")
+            self.status_label.set_text("Error: Unable to apply MS-DOS theme.")
+
+    def on_hax0r_theme_selected(self, menuitem):
+        try:
+            # Load the custom font
+            font_path = os.path.join(os.getcwd(), "DOS.ttf")
+            if not os.path.isfile(font_path):
+                self.status_label.set_text("Error: font.ttf not found.")
+                return
+            
+            # Apply the font using Pango
+            font_description = Pango.FontDescription()
+            font_description.set_family("Monospace")  # Fallback if font fails
+            font_description.set_size(14 * Pango.SCALE)  # Font size in Pango units
+            css_provider = Gtk.CssProvider()
+    
+            # Custom CSS for MS-DOS theme
+            css = f"""
+            * {{
+                font-family: "{font_path}", Monospace;
+                font-size: 14px;
+                font-weight: normal;
+                background-color: #000000;
+                color: #00FF00;
+            }}
+            #path_label {{
+                color: #00FF00;  /* Green text for tooltips */
+            }}
+            #image_viewer_container {{
+                background-color: #000000; /* Black background for image viewer */
+            }}
+            """
+            css_provider.load_from_data(css.encode("utf-8"))
+    
+            # Apply CSS globally
+            Gtk.StyleContext.add_provider_for_screen(
+                Gdk.Screen.get_default(),
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+    
+            # Update status label to confirm theme change
+            self.status_label.set_text("MS-DOS Theme Applied")
+        except Exception as e:
+            print(f"Error applying MS-DOS theme: {e}")
+            self.status_label.set_text("Error: Unable to apply MS-DOS theme.")
+
+    def on_deus_ex_amber_theme_selected(self, menuitem):
+        try:
+            # Load the custom font
+            font_path = os.path.join(os.getcwd(), "deusex.otf")
+            if not os.path.isfile(font_path):
+                self.status_label.set_text("Error: deusex.otf not found.")
+                return
+            
+            # Load the custom font using Fontconfig
+            import subprocess
+            font_dir = os.path.join(tempfile.gettempdir(), "custom_fonts")
+            os.makedirs(font_dir, exist_ok=True)
+            shutil.copy(font_path, font_dir)
+            subprocess.run(["fc-cache", "-f", "-v", font_dir], check=True)
+    
+            # Use the font family name defined in DEUSEX.ttf
+            font_family = "DeusEx"  # Replace with the actual font family name in the TTF file
+    
+            # Custom CSS for Deus Ex Amber theme
+            css = f"""
+            * {{
+                font-family: "{font_family}", Monospace;
+                font-size: 14px;
+                font-weight: normal;
+                background-color: #121212;
+                color: #b38235;  /* Amber text */
+            }}
+            #path_label {{
+                color: #b38235;  /* Amber text for tooltips */
+            }}
+            #image_viewer_container {{
+                background-color: #121212; /* Deep grey background for image viewer */
+            }}
+            GtkTreeView {{
+                background-color: #121212;
+                color: #FFA500;
+            }}
+            GtkTreeView:selected {{
+                background-color: #444444;
+                color: #FFFFFF;
+            }}
+            GtkTreeView * {{
+                background-color: transparent;  /* Prevent black panes */
+            }}
+            """
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_data(css.encode("utf-8"))
+    
+            # Apply CSS globally
+            Gtk.StyleContext.add_provider_for_screen(
+                Gdk.Screen.get_default(),
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+    
+            # Update status label to confirm theme change
+            self.status_label.set_text("Deus Ex Amber Theme Applied")
+        except subprocess.CalledProcessError as e:
+            print(f"Fontconfig error: {e}")
+            self.status_label.set_text("Error: Unable to apply Deus Ex Amber theme (Fontconfig issue).")
+        except Exception as e:
+            print(f"Error applying Deus Ex Amber theme: {e}")
+            self.status_label.set_text("Error: Unable to apply Deus Ex Amber theme.")
+    
     def create_media_controls(self, grid):
         controls_box = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL,
@@ -854,6 +1229,36 @@ class MidiSoundfontTester(Gtk.Window):
                 self.save_favourites()  # Save changes to the file
             self.all_filter.refilter()
             self.update_file_column_title()
+
+    def toggle_image_viewer(self):
+        # Toggle the image_viewer flag
+        self.image_viewer = not self.image_viewer
+    
+        # Update the visibility of the image viewer
+        self.update_image_viewer_visibility()
+    
+        # Update the status label
+        self.status_label.set_text(f"Image Viewer {'Enabled' if self.image_viewer else 'Disabled'}")
+    
+        # Update the menu item state if you have one
+        if hasattr(self, 'image_viewer_menuitem'):
+            self.image_viewer_menuitem.handler_block_by_func(self.on_image_viewer_toggled)
+            self.image_viewer_menuitem.set_active(self.image_viewer)
+            self.image_viewer_menuitem.handler_unblock_by_func(self.on_image_viewer_toggled)
+    
+        # Handle online services dependency
+        if not self.image_viewer and self.online_services:
+            self.online_services = False
+            # Update the online services menu item
+            if hasattr(self, 'online_services_menuitem'):
+                self.online_services_menuitem.handler_block_by_func(self.on_online_services_toggled)
+                self.online_services_menuitem.set_active(False)
+                self.online_services_menuitem.handler_unblock_by_func(self.on_online_services_toggled)
+            self.status_label.set_text("Online Services Disabled because Image Viewer was turned off")
+    
+        # If the image viewer is enabled, update the image pane
+        if self.image_viewer:
+            self.update_image_pane()
 
     def find_row_iter_by_file(self, file_path):
         # Iterate through the ListStore to find the row with the matching file path
@@ -1275,7 +1680,7 @@ class MidiSoundfontTester(Gtk.Window):
             GLib.idle_add(self.status_label.set_text, "Dark Mode Enabled")
         else:
             GLib.idle_add(self.status_label.set_text, "Dark Mode Disabled")
-
+    
     def apply_monospace_font(self, widget):
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""

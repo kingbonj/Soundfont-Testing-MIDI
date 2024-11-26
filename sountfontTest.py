@@ -370,27 +370,6 @@ class MidiSoundfontTester(Gtk.Window):
         view_item = Gtk.MenuItem(label="View")
         view_item.set_submenu(view_menu)  # Associate the Settings menu with the Settings item
 
-        # Theme submenu
-        theme_menu = Gtk.Menu()
-        theme_item = Gtk.MenuItem(label="🎨 Theme...")
-        theme_item.set_submenu(theme_menu)
-        view_menu.append(theme_item)
-    
-        # MS-DOS theme menu item
-        msdos_theme_item = Gtk.MenuItem(label="MS-DOS")
-        msdos_theme_item.connect("activate", self.on_msdos_theme_selected)
-        theme_menu.append(msdos_theme_item)
-        hax0r_theme_item = Gtk.MenuItem(label="L33t Hax0r")
-        hax0r_theme_item.connect("activate", self.on_hax0r_theme_selected)
-        theme_menu.append(hax0r_theme_item)
-        deus_ex_amber_theme_item = Gtk.MenuItem(label="Deus Ex Amber")
-        deus_ex_amber_theme_item.connect("activate", self.on_deus_ex_amber_theme_selected)
-        theme_menu.append(deus_ex_amber_theme_item)
-        # Add Chiptune Blue Theme option
-        chiptune_theme_item = Gtk.MenuItem(label="Chiptune Blue")
-        chiptune_theme_item.connect("activate", self.on_chiptune_blue_theme_selected)
-        theme_menu.append(chiptune_theme_item)
-
          # Create Image Viewer menu item
         self.image_viewer_menuitem = Gtk.CheckMenuItem(label="🖻 Image Viewer")
         self.image_viewer_menuitem.set_active(self.image_viewer)
@@ -410,7 +389,24 @@ class MidiSoundfontTester(Gtk.Window):
         )
         dark_mode_item.connect("toggled", self.on_dark_mode_toggled)
         view_menu.append(dark_mode_item)
-        
+
+        # Theme submenu
+        theme_menu = Gtk.Menu()
+        theme_item = Gtk.MenuItem(label="🎨 Themes...")
+        theme_item.set_submenu(theme_menu)
+        view_menu.append(theme_item)
+    
+        # MS-DOS theme menu item
+        msdos_theme_item = Gtk.MenuItem(label="MS-DOS")
+        msdos_theme_item.connect("activate", self.on_msdos_theme_selected)
+        theme_menu.append(msdos_theme_item)
+        deus_ex_amber_theme_item = Gtk.MenuItem(label="Sarif Industries")
+        deus_ex_amber_theme_item.connect("activate", self.on_deus_ex_amber_theme_selected)
+        theme_menu.append(deus_ex_amber_theme_item)
+        chiptune_theme_item = Gtk.MenuItem(label="Chiptune Blues")
+        chiptune_theme_item.connect("activate", self.on_chiptune_blue_theme_selected)
+        theme_menu.append(chiptune_theme_item)
+
         # Create the About Menu
         about_menu = Gtk.Menu()
         about_item = Gtk.MenuItem(label="About")
@@ -449,7 +445,6 @@ class MidiSoundfontTester(Gtk.Window):
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.set_placeholder_text("Filter files...")
         self.search_entry.connect("search-changed", self.on_search_changed)
-        self.apply_monospace_font(self.search_entry)
         left_pane_box.pack_start(self.search_entry, False, False, 0)
         
         self.all_store = Gtk.ListStore(object, object, object)
@@ -550,23 +545,6 @@ class MidiSoundfontTester(Gtk.Window):
         self.image_box.pack_start(scrolled_window_image, True, True, 0)
 
         self.image_box.set_name("image_viewer_container")  # Assign ID
-
-        # Create a CSS provider for the image viewer
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(b"""
-            #image_viewer,
-            #image_viewer_container,
-            #image_viewer_scrolled_window {
-                background-color: rgba(0, 0, 0, 0);
-            }
-        """)
-    
-        # Apply the CSS provider to the widgets
-        widgets_to_style = [self.image_pane, self.image_box, scrolled_window_image]
-        for widget in widgets_to_style:
-            widget.get_style_context().add_provider(
-                css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
         
         # Add image_box to the upper pane
         upper_hpaned.add2(self.image_box)
@@ -602,22 +580,6 @@ class MidiSoundfontTester(Gtk.Window):
         # Assign IDs to parent containers if not already done
         upper_hpaned.set_name("upper_pane")
         vpaned.set_name("vertical_pane")
-        
-        # Update your CSS to include these containers
-        css_provider.load_from_data(b"""
-            #image_viewer,
-            #image_viewer_container,
-            #image_viewer_scrolled_window {
-                background-color: rgba(0, 0, 0, 0);
-            }
-        """)
-        
-        # Apply the CSS provider to the new widgets
-        widgets_to_style.extend([upper_hpaned, vpaned])
-        for widget in widgets_to_style:
-            widget.get_style_context().add_provider(
-                css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
 
     def on_resize_upper_pane(self, widget, allocation):
         total_height = allocation.height
@@ -717,244 +679,740 @@ class MidiSoundfontTester(Gtk.Window):
             filename = ''
         cell.set_property('text', filename)
 
-    def on_chiptune_blue_theme_selected(self, menuitem):
+    def apply_custom_theme(self, theme_name, font_filename, font_family, css_body):
         try:
             # Load the custom font
-            font_path = os.path.join(os.getcwd(), "DOS.ttf")
+            font_path = os.path.join(os.getcwd(), font_filename)
             if not os.path.isfile(font_path):
-                self.status_label.set_text("Error: Chiptune.ttf not found.")
+                self.status_label.set_text(f"Error: {font_filename} not found.")
                 return
     
-            # Load the custom font using Fontconfig
-            import subprocess
+            # Create a temporary directory for custom fonts
             font_dir = os.path.join(tempfile.gettempdir(), "custom_fonts")
             os.makedirs(font_dir, exist_ok=True)
             shutil.copy(font_path, font_dir)
-            subprocess.run(["fc-cache", "-f", "-v", font_dir], check=True)
     
-            # Use the font family name defined in Chiptune.ttf
-            font_family = "Chiptune"  # Replace with the actual font family name in the TTF file
+            # Update the font cache for the temporary directory
+            subprocess.run(["fc-cache", "-f", font_dir], check=True)
     
-            # Custom CSS for Chiptune Blue theme
+            # Ensure the font directory is included in Fontconfig paths
+            if "FONTCONFIG_PATH" in os.environ:
+                os.environ["FONTCONFIG_PATH"] += os.pathsep + font_dir
+            else:
+                os.environ["FONTCONFIG_PATH"] = font_dir
+    
+            # Apply the CSS
             css = f"""
             * {{
                 font-family: "{font_family}", Monospace;
-                font-size: 14px;
-                font-weight: bold;
-                background-color: #000088;
-                color: #FFFF00;  /* Cyan text */
             }}
-            #path_label {{
-                color: #FF0000;  /* Cyan text for tooltips */
-            }}
-            #image_viewer_container {{
-                background-color: #000088; /* Deep blue background for image viewer */
-            }}
-            GtkTreeView {{
-                background-color: #000088;
-                color: #00FFFF;
-            }}
-            GtkTreeView:selected {{
-                background-color: #FFFFFF;  /* Highlight with brighter blue */
-                color: #FFFFFF;
-            }}
-            GtkTreeView * {{
-                background-color: transparent;  /* Prevent black panes */
-            }}
+            {css_body}
             """
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_data(css.encode("utf-8"))
     
-            # Apply CSS globally
+            style_provider = Gtk.CssProvider()
+            style_provider.load_from_data(css_body.encode('utf-8'))
+            
             Gtk.StyleContext.add_provider_for_screen(
                 Gdk.Screen.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+                style_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION  # Ensure high priority
             )
-    
             # Update status label to confirm theme change
-            self.status_label.set_text("Chiptune Blue Theme Applied")
+            self.status_label.set_text(f"{theme_name} Theme Applied")
         except subprocess.CalledProcessError as e:
             print(f"Fontconfig error: {e}")
-            self.status_label.set_text("Error: Unable to apply Chiptune Blue theme (Fontconfig issue).")
+            self.status_label.set_text(f"Error: Unable to apply {theme_name} theme (Fontconfig issue).")
         except Exception as e:
-            print(f"Error applying Chiptune Blue theme: {e}")
-            self.status_label.set_text("Error: Unable to apply Chiptune Blue theme.")
+            print(f"Error applying {theme_name} theme: {e}")
+            self.status_label.set_text(f"Error: Unable to apply {theme_name} theme.")
+
+    def on_chiptune_blue_theme_selected(self, menuitem):
+        # Define theme configurations
+        font_filename = "DOS.ttf"
+        font_family = "DOS"
+    
+        css_body = """
+        * {
+            font-family: "DOS", Monospace;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #000088;
+            color: #FFFF00;
+            border: none;
+        }
+        menuitem > label {
+            color: darkgray;
+            background-color: darkblue;
+        }
+
+        menuitem:hover, menuitem:selected > label,
+        menuitem:hover > label {
+            color: darkblue;
+            background-color: darkgray;
+        }
+
+        textview * {
+            background-color: transparent;
+            color: darkgray;
+        }
+        textview text selection {
+            background-color: darkgray;
+            color: darkblue;
+        }
+        treeview {
+            background-color: transparent;
+            color: darkgray;
+        }
+
+        treeview row:hover {
+            background-color: darkgray;
+            color: darkblue;
+        }
+        
+        treeview row:selected {
+            background-color: darkgray;
+            color: #000088;
+        }
+
+        treeview:selected {
+            background-color: darkgray;
+            color: #000088;
+        }
+        treeview:hover {
+            background-color: darkgray;
+            color: darkblue;
+        }
+        treeview row {
+            background-color: #000088;
+            color: #FFFFFF;
+        }
+
+        treeview > header {
+            background-color: inherit;
+            color: darkgray;
+            font-weight: bold;
+            padding: 5px;
+        }
+        
+        /* Buttons */
+        button {
+            background-color: #000088; /* Default button background */
+            color: #FFFF00;           /* Default button text/icon colour */
+            border: 1px solid #FFFF00; /* Add a border to distinguish buttons */
+            margin: 0;
+        }
+        scrolledwindow {
+            background-color: transparent; /* Ensure ScrolledWindow background is unaffected */
+            border: none;                 /* Remove any borders applied by the global rule */
+        }
+        
+        scrolledwindow > * {
+            background-color: transparent; /* Ensure child widgets of ScrolledWindow inherit transparency */
+        }
+        
+        treeview {
+            background-color: transparent; /* Ensure TreeView rows are transparent */
+        }
+        
+        overshoot {
+            background-color: transparent; /* Prevent coloured blocks in overshoot areas */
+        }
+
+
+        button:active {
+            background-color: #000088; /* Active button retains dark blue background */
+            color: #FFFF00;
+        }
+        
+        button:focus {
+            background-color: #000088; /* Focused button retains dark blue background */
+            color: #FFFF00;
+        }
+        
+        button:disabled {
+            background-color: darkgray; /* Disabled button greyed out */
+            color: black;
+        }
+        
+        /* Round Buttons (custom class) */
+        button.round-button {
+            background-color: #000088;
+            color: darkgray;
+            border-radius: 15px;      /* Makes buttons round */
+            border: 1px solid #FFFF00;
+            padding: 10px;
+        }
+        
+        button.round-button:hover {
+            background-color: darkgray;
+            color: darkblue;
+        }
+
+        button.round-button:hover > image {
+            background-color: transparent;
+            color: darkblue;
+        }
+        
+        button.round-button:active {
+            background-color: #000088;
+            color: #FFFF00;
+        }
+        
+        button.round-button:focus {
+            background-color: darkgray;
+            color: #FFFF00;
+        }
+        
+        button > image,
+        button.round-button > image,
+        button.media-button > image {
+            background-color: transparent;
+            color: inherit; 
+        }
+
+        button > label,
+        button.round-button > label,
+        button.media-button > label {
+            background-color: #000088;
+            color: #FFFF00; 
+        }
+
+        button > box > label,
+            button.round-button > label,
+            button.media-button > label {
+            background-color: #000088;
+            color: #FFFF00; 
+        }
+
+        button:hover > box > label,
+            button.round-button > label,
+            button.media-button > label {
+            background-color: darkgray;
+            color: darkblue; 
+        }        
+
+        button:hover > box > image,
+            button.round-button > label,
+            button.media-button > label {
+            background-color: transparent;
+            color: darkblue; 
+        }
+        volumebutton > *{
+            background-color: #000088;
+            color: #FFFF00;
+            border: none; /* Flat button style */
+            padding: 5px;
+            border-radius: 10px; /* Slight rounding for modern aesthetics */
+        }
+        
+        /* Hover and Active States */
+        volumebutton:hover > * {
+            background-color: darkgray;
+            color: darkblue;
+        }
+        
+        volumebutton:active > * {
+            background-color: #000088;
+            color: #FFFF00;
+        }
+        
+        /* Scrollbars */
+        scrollbar * {
+            background-color: darkgray;
+        }
+        
+        label {
+            background-color: #000088;
+            color: #FFFF00; 
+        }
+
+        label:hover {
+            background-color: darkgray;
+            color: darkblue; 
+        }
+
+        button:hover > box,
+        button:hover > label,
+        button:hover > image,
+        button:hover > box > label, 
+        button:hover > box > image {
+            background-color: transparent; /* Label background on hover */
+            color: #FFFF00;            /* Optional: Change label text colour */
+            padding: 0;                /* Remove extra padding */
+            margin: 0;                 /* Remove any default margin */
+        }
+
+        button:focus > box,
+        button:focus > label,
+        button:focus > image,
+        button:focus > box > label, 
+        button:focus > box > image {
+            background-color: darkgray; /* Label background on hover */
+            color: darkblue;            /* Optional: Change label text colour */
+            padding: 0;                /* Remove extra padding */
+            margin: 0;                 /* Remove any default margin */
+        }   
+        
+        scrollbar slider {
+            background-color: #000088;
+            border: 1px solid darkgray;
+        }
+        
+        scrollbar slider:hover {
+            background-color: darkgray;
+        }
+
+        scrollbar trough {
+            background-color: #000088;
+        }
+        
+        /* Tooltip */
+        tooltip {
+            background-color: #000088;
+            color: #FFFF00;
+            border: 1px solid #FFFF00;
+            padding: 5px;
+        }
+        """
+    
+        # Apply the theme
+        style_provider = Gtk.CssProvider()
+        style_provider.load_from_data(css_body.encode("utf-8"))
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            style_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+    
+        # Apply font
+        self.apply_custom_theme("Chiptune Blue", font_filename, font_family, css_body)
 
     def on_msdos_theme_selected(self, menuitem):
-        try:
-            # Define the path to the custom font file
-            font_path = os.path.join(os.getcwd(), "DOS.ttf")
-            if not os.path.isfile(font_path):
-                self.status_label.set_text("Error: DOS.ttf not found.")
-                return
-    
-            # Load the custom font using Fontconfig
-            import subprocess
-            font_dir = os.path.join(tempfile.gettempdir(), "custom_fonts")
-            os.makedirs(font_dir, exist_ok=True)
-            shutil.copy(font_path, font_dir)
-    
-            # Update Fontconfig to include the temporary directory
-            subprocess.run(["fc-cache", "-f", "-v", font_dir], check=True)
-    
-            # Use the font family name defined in DOS.ttf
-            font_family = "DOS"  # Replace with the actual font family name in the TTF file
-    
-            # Custom CSS for MS-DOS theme
-            css = f"""
-            * {{
-                font-family: "{font_family}", Monospace;
-                font-size: 14px;
-                font-weight: bold;
-                background-color: #000000;
-                color: #8e8e8e;
-            }}
-            #path_label {{
-                color: #8e8e8e;  /* Grey text for tooltips */
-            }}
-            #image_viewer_container {{
-                background-color: #000000; /* Black background for image viewer */
-            }}
-            GtkTreeView {{
-                background-color: #000000;
-                color: #8e8e8e;
-            }}
-            GtkTreeView:selected {{
-                background-color: #444444;
-                color: #ffffff;
-            }}
-            GtkTreeView * {{
-                background-color: transparent;  /* Prevent black panes */
-            }}
-            """
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_data(css.encode("utf-8"))
-    
-            # Apply CSS globally
-            Gtk.StyleContext.add_provider_for_screen(
-                Gdk.Screen.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-    
-            # Update the status label to confirm theme change
-            self.status_label.set_text("MS-DOS Theme Applied (Bold)")
-        except subprocess.CalledProcessError as e:
-            print(f"Fontconfig error: {e}")
-            self.status_label.set_text("Error: Unable to apply MS-DOS theme (Fontconfig issue).")
-        except Exception as e:
-            print(f"Error applying MS-DOS theme: {e}")
-            self.status_label.set_text("Error: Unable to apply MS-DOS theme.")
-
-    def on_hax0r_theme_selected(self, menuitem):
-        try:
-            # Load the custom font
-            font_path = os.path.join(os.getcwd(), "DOS.ttf")
-            if not os.path.isfile(font_path):
-                self.status_label.set_text("Error: font.ttf not found.")
-                return
+        # Define font details
+        font_filename = "DOS.ttf"  # Ensure this font file exists in the working directory
+        font_family = "Perfect DOS VGA 437 Win"
             
-            # Apply the font using Pango
-            font_description = Pango.FontDescription()
-            font_description.set_family("Monospace")  # Fallback if font fails
-            font_description.set_size(14 * Pango.SCALE)  # Font size in Pango units
-            css_provider = Gtk.CssProvider()
+        # Define the CSS body
+        css_body = """
+        * {
+            font-family: "Perfect DOS VGA 437 Win", Monospace;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #000000;  /* Black background */
+            color: darkgray;            /* Grey text */
+            border: none;
+        }
     
-            # Custom CSS for MS-DOS theme
-            css = f"""
-            * {{
-                font-family: "{font_path}", Monospace;
-                font-size: 14px;
-                font-weight: normal;
-                background-color: #000000;
-                color: #00FF00;
-            }}
-            #path_label {{
-                color: #00FF00;  /* Green text for tooltips */
-            }}
-            #image_viewer_container {{
-                background-color: #000000; /* Black background for image viewer */
-            }}
-            """
-            css_provider.load_from_data(css.encode("utf-8"))
+        menuitem > label {
+            color: darkgray;            /* Grey text */
+            background-color: #000000; /* Black */
+        }
     
-            # Apply CSS globally
-            Gtk.StyleContext.add_provider_for_screen(
-                Gdk.Screen.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
+        menuitem:hover, menuitem:selected > label,
+        menuitem:hover > label {
+            color: #000000;            /* Black text on hover */
+            background-color: darkgray; /* Grey */
+        }
     
-            # Update status label to confirm theme change
-            self.status_label.set_text("MS-DOS Theme Applied")
-        except Exception as e:
-            print(f"Error applying MS-DOS theme: {e}")
-            self.status_label.set_text("Error: Unable to apply MS-DOS theme.")
+        textview * {
+            background-color: transparent;
+            color: darkgray;
+        }
 
+        textview text selection {
+            background-color: darkgray;
+            color: #000000;
+        }
+        
+        treeview {
+            background-color: transparent;
+            color: darkgray;
+        }
+    
+        treeview row:hover {
+            background-color: darkgray; /* Grey */
+            color: #000000;            /* Black */
+        }
+    
+        treeview row:selected {
+            background-color: darkgray;
+            color: #000000;
+        }
+    
+        treeview:selected {
+            background-color: darkgray;
+            color: #000000;
+        }
+    
+        treeview:hover {
+            background-color: darkgray;
+            color: #000000;
+        }
+    
+        treeview row {
+            background-color: #000000;
+            color: #FFFFFF;            /* White text */
+        }
+    
+        treeview > header {
+            background-color: inherit;
+            color: darkgray;
+            font-weight: bold;
+            padding: 5px;
+        }
+        
+        /* Buttons */
+        button {
+            background-color: #000000; /* Default button background */
+            color: #C0C0C0;           /* Grey text/icon */
+            border: 1px solid darkgray;
+            margin: 0;
+        }
+    
+        button:hover {
+            background-color: darkgray; /* Grey */
+            color: #000000;            /* Black text */
+        }
+    
+        button:active {
+            background-color: #000000;
+            color: #C0C0C0;
+        }
+    
+        button:focus {
+            background-color: #000000;
+            color: #C0C0C0;
+        }
+    
+        button:disabled {
+            background-color: #808080; /* Dim grey */
+            color: #000000;
+        }
+    
+        /* Round Buttons */
+        button.round-button {
+            background-color: #000000;
+            color: #C0C0C0;
+            border-radius: 15px;
+            border: 1px solid darkgray;
+            padding: 10px;
+        }
+    
+        button.round-button:hover {
+            background-color: darkgray;
+            color: #000000;
+        }
+    
+        button.round-button:active {
+            background-color: #000000;
+            color: darkgray;
+        }
+    
+        button.round-button:focus {
+            background-color: darkgray;
+            color: darkgray;
+        }
+    
+        button > image,
+        button.round-button > image,
+        button.media-button > image {
+            background-color: transparent;
+            color: white;
+        }
+    
+        button > label,
+        button.round-button > label,
+        button.media-button > label {
+            background-color: transparent;
+            color: red;
+        }
+    
+        volumebutton > * {
+            background-color: #000000;
+            color: darkgray;
+            border: none;
+            padding: 5px;
+            border-radius: 10px;
+        }
+    
+        volumebutton:hover > * {
+            background-color: darkgray;
+            color: #000000;
+        }
+    
+        volumebutton:active > * {
+            background-color: #000000;
+            color: darkgray;
+        }
+    
+        scrollbar * {
+            background-color: darkgray;
+        }
+    
+        scrollbar slider {
+            background-color: #000000;
+            border: 1px solid darkgray;
+        }
+    
+        scrollbar slider:hover {
+            background-color: darkgray;
+        }
+    
+        scrollbar trough {
+            background-color: #000000;
+        }
+    
+        label {
+            background-color: #000000;
+            color: darkgray;
+        }
+    
+        label:hover {
+            background-color: darkgray;
+            color: #000000;
+        }
+    
+        tooltip {
+            background-color: #000000;
+            color: darkgray;
+            border: 1px solid darkgray;
+            padding: 5px;
+        }
+        scrolledwindow {
+            background-color: transparent; /* Ensure ScrolledWindow background is unaffected */
+            border: none;                 /* Remove any borders applied by the global rule */
+        }
+        
+        scrolledwindow > * {
+            background-color: transparent; /* Ensure child widgets of ScrolledWindow inherit transparency */
+        }
+        """
+            
+        # Apply the theme
+        style_provider = Gtk.CssProvider()
+        style_provider.load_from_data(css_body.encode("utf-8"))
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            style_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+    
+        # Apply font
+        self.apply_custom_theme("MS-DOS", font_filename, font_family, css_body)
+    
     def on_deus_ex_amber_theme_selected(self, menuitem):
-        try:
-            # Load the custom font
-            font_path = os.path.join(os.getcwd(), "deusex.otf")
-            if not os.path.isfile(font_path):
-                self.status_label.set_text("Error: deusex.otf not found.")
-                return
-            
-            # Load the custom font using Fontconfig
-            import subprocess
-            font_dir = os.path.join(tempfile.gettempdir(), "custom_fonts")
-            os.makedirs(font_dir, exist_ok=True)
-            shutil.copy(font_path, font_dir)
-            subprocess.run(["fc-cache", "-f", "-v", font_dir], check=True)
+        # Define font details
+        font_filename = "deusex.otf"  # Ensure this font file exists in the working directory
+        font_family = "Deus Ex"
+        
+        # Define the CSS body
+        css_body = """
+        * {
+            font-family: "Deus Ex", Monospace;
+            font-size: 14px;
+            font-weight: normal;
+            background-color: #1a1a1a; /* Dark base background */
+            color: #b38235;           /* Amber text */
+            border: none;
+        }
+
+        menuitem {
+            color: #b38235;           /* Amber text */
+            background-color: #1a1a1a; /* Slightly lighter dark background */
+        }
     
-            # Use the font family name defined in DEUSEX.ttf
-            font_family = "DeusEx"  # Replace with the actual font family name in the TTF file
+        menuitem > label {
+            color: #b38235;           /* Amber text */
+            background-color: #1a1a1a; /* Slightly lighter dark background */
+        }
     
-            # Custom CSS for Deus Ex Amber theme
-            css = f"""
-            * {{
-                font-family: "{font_family}", Monospace;
-                font-size: 14px;
-                font-weight: normal;
-                background-color: #121212;
-                color: #b38235;  /* Amber text */
-            }}
-            #path_label {{
-                color: #b38235;  /* Amber text for tooltips */
-            }}
-            #image_viewer_container {{
-                background-color: #121212; /* Deep grey background for image viewer */
-            }}
-            GtkTreeView {{
-                background-color: #121212;
-                color: #FFA500;
-            }}
-            GtkTreeView:selected {{
-                background-color: #444444;
-                color: #FFFFFF;
-            }}
-            GtkTreeView * {{
-                background-color: transparent;  /* Prevent black panes */
-            }}
-            """
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_data(css.encode("utf-8"))
+        menuitem:hover, menuitem:selected > label,
+        menuitem:hover > label {
+            color: #121212;           /* Dark text on hover */
+            background-color: #b38235; /* Amber background */
+        }
     
-            # Apply CSS globally
-            Gtk.StyleContext.add_provider_for_screen(
-                Gdk.Screen.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
+        textview * {
+            background-color: transparent;
+            color: #b38235;
+        }
+
+        textview text selection {
+            background-color: #b38235;
+            color: #121212;
+        }
+        
+        treeview {
+            background-color: transparent;
+            color: #b38235;
+        }
     
-            # Update status label to confirm theme change
-            self.status_label.set_text("Deus Ex Amber Theme Applied")
-        except subprocess.CalledProcessError as e:
-            print(f"Fontconfig error: {e}")
-            self.status_label.set_text("Error: Unable to apply Deus Ex Amber theme (Fontconfig issue).")
-        except Exception as e:
-            print(f"Error applying Deus Ex Amber theme: {e}")
-            self.status_label.set_text("Error: Unable to apply Deus Ex Amber theme.")
+        treeview row:hover {
+            background-color: #242424; /* Highlighted grey */
+            color: #b38235;
+        }
+        
+        treeview row:selected {
+            background-color: #b38235; /* Amber selection */
+            color: #121212;           /* Inverse text */
+        }
+    
+        treeview:selected {
+            background-color: #b38235;
+            color: #121212;
+        }
+    
+        treeview:hover {
+            background-color: #242424;
+            color: #b38235;
+        }
+    
+        treeview row {
+            background-color: #121212;
+            color: #b38235;
+        }
+    
+        treeview > header {
+            background-color: inherit;
+            color: #b38235;
+            font-weight: bold;
+            padding: 5px;
+        }
+        
+        /* Buttons */
+        button {
+            background-color: #1a1a1a;
+            color: #b38235;
+            border: 1px solid #b38235;
+            margin: 0;
+        }
+    
+        button:hover {
+            background-color: #242424;
+            color: #b38235;
+        }
+    
+        button:active {
+            background-color: #b38235;
+            color: #121212;
+        }
+    
+        button:focus {
+            background-color: #1a1a1a;
+            color: #b38235;
+        }
+    
+        button:disabled {
+            background-color: #2e2e2e;
+            color: #555555;
+        }
+    
+        button.round-button {
+            background-color: #1a1a1a;
+            color: #b38235;
+            border-radius: 15px;
+            border: 1px solid #b38235;
+            padding: 10px;
+        }
+    
+        button.round-button:hover {
+            background-color: #242424;
+            color: #b38235;
+        }
+    
+        button.round-button:active {
+            background-color: #b38235;
+            color: #121212;
+        }
+
+        button > image,
+        button.round-button > image,
+        button.media-button > image {
+                background-color: transparent;
+                color: #b38235;
+        }
+    
+        button > label,
+        button.round-button > label,
+        button.media-button > label {
+            background-color: transparent;
+            color: #b38235;
+        }
+    
+        volumebutton > * {
+            background-color: #1a1a1a;
+            color: #b38235;
+            border: none;
+            padding: 5px;
+            border-radius: 10px;
+        }
+    
+        volumebutton:hover > * {
+            background-color: #242424;
+            color: #b38235;
+        }
+    
+        volumebutton:active > * {
+            background-color: #b38235;
+            color: #121212;
+        }
+    
+        scrollbar * {
+            background-color: #1a1a1a;
+        }
+    
+        scrollbar slider {
+            background-color: #b38235;
+            border: 1px solid #1a1a1a;
+        }
+    
+        scrollbar slider:hover {
+            background-color: #b38235;
+        }
+    
+        scrollbar trough {
+            background-color: #121212;
+        }
+    
+        label {
+            background-color: #1a1a1a;
+            color: #b38235;
+        }
+    
+        label:hover {
+            background-color: #242424;
+            color: #b38235;
+        }
+    
+        tooltip {
+            background-color: #1a1a1a;
+            color: #b38235;
+            border: 1px solid #b38235;
+            padding: 5px;
+        }
+
+        scrolledwindow {
+            background-color: transparent;
+            border: none;
+        }
+        
+        scrolledwindow > * {
+            background-color: transparent;
+        }
+        
+        """
+        
+        # Apply the theme
+        style_provider = Gtk.CssProvider()
+        style_provider.load_from_data(css_body.encode("utf-8"))
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            style_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+    
+        # Apply font
+        self.apply_custom_theme("Deus Ex Amber", font_filename, font_family, css_body)
     
     def create_media_controls(self, grid):
         controls_box = Gtk.Box(
@@ -971,29 +1429,6 @@ class MidiSoundfontTester(Gtk.Window):
         controls_box.set_margin_start(5)
         controls_box.set_margin_end(5)
         grid.attach(controls_box, 0, 2, 1, 1)
-    
-        # Create a CSS provider for styling
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(b"""
-            .round-button {
-                border-radius: 30%; /* Makes the button round */
-                padding: 5px; /* Adjust padding for proper size */
-                background-color: rgba(0, 0, 0, 0);
-            }
-            .button {
-                border-radius: 10px; /* Makes the button round */
-                padding: 5px; /* Adjust padding for proper size */
-                background-color: rgba(0, 0, 0, 0);
-            }
-            .label {
-                font-size: 12px
-            }
-        """)
-        
-        # Apply the CSS to the GTK application
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
         
         # Create the Gtk.Image from a file
         try:
@@ -1005,28 +1440,42 @@ class MidiSoundfontTester(Gtk.Window):
         self.image.set_size_request(50, 20)  # Width: 50px, Height: 20px
         controls_box.pack_start(self.image, False, False, 0)
     
-        # Add the spinner at the end of the controls_box
         self.spinner = Gtk.Spinner()
         self.spinner.set_size_request(20, 20)  # Set a size to ensure visibility
         controls_box.pack_start(self.spinner, False, False, 0)
+        # Create a CSS provider and apply it globally
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b"""
+            .round-button {
+                padding: 10px; /* Ensure round-button padding is consistent */
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_USER
+        )
     
+        # Helper function to create round buttons
+        # Helper function to create round buttons with symbolic icons
+        def create_round_button(icon_name, tooltip, callback):
+            button = Gtk.Button()
+            icon = Gtk.Image.new_from_icon_name(f"{icon_name}-symbolic", Gtk.IconSize.BUTTON)
+            button.add(icon)
+            button.set_tooltip_text(tooltip)
+            button.connect("clicked", callback)
+            button.set_size_request(50, 50)  # Optional size to make buttons consistent
+            button.get_style_context().add_class("round-button")  # Add the custom CSS class
+            return button
+
         self.volume_button = Gtk.VolumeButton()
         initial_volume = self.get_current_volume()
         self.volume_button.set_value(initial_volume)  # Set initial volume to current level
         self.volume_button.connect("value-changed", self.on_volume_changed)
-        self.volume_button.get_style_context().add_class("round-button")
-        self.volume_button.set_size_request(50, 50)  # Width: 40px, Height: 40px
+        self.volume_button.set_size_request(50, 50)  # Optional size to match round button size
+        self.volume_button.get_style_context().add_class("round-button")  # Apply the CSS class
         controls_box.pack_start(self.volume_button, False, False, 0)
-    
-        # Helper function to create round buttons
-        def create_round_button(icon_name, tooltip, callback):
-            button = Gtk.Button()
-            button.add(Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.BUTTON))
-            button.set_tooltip_text(tooltip)
-            button.connect("clicked", callback)
-            button.get_style_context().add_class("round-button")
-            return button
-            
+
         # Radio Button
         self.fav_button = create_round_button("starred", "Favourites", self.on_fav)
         controls_box.pack_start(self.fav_button, False, False, 0)
@@ -1055,7 +1504,6 @@ class MidiSoundfontTester(Gtk.Window):
         self.playback_label = Gtk.Label(label="00:00 / 00:00")
         self.playback_label.set_margin_start(10)  # Add some space between the button and label
         self.playback_label.set_justify(Gtk.Justification.LEFT)
-        self.apply_monospace_font(self.playback_label)
         controls_box.pack_start(self.playback_label, False, False, 0)
 
         # Create a right-aligned box for the status label
@@ -1067,9 +1515,7 @@ class MidiSoundfontTester(Gtk.Window):
         self.status_label = Gtk.Label(label="Ready")
         self.status_label.set_ellipsize(Pango.EllipsizeMode.END)  # Ellipsize text if too long
         self.status_label.set_max_width_chars(100)  # Limit width (adjust as needed)
-        self.status_label.get_style_context().add_class("label")
-        self.apply_monospace_font(self.status_label)
-    
+        self.status_label.get_style_context().add_class("label")    
         status_box.pack_end(self.status_label, False, False, 0)
         controls_box.pack_start(status_box, True, True, 0)
     
@@ -1079,8 +1525,7 @@ class MidiSoundfontTester(Gtk.Window):
         output_dir = os.path.join(os.getcwd(), "Output")
         self.save_button.set_tooltip_text(f"Export mp3 to {output_dir}")
         self.save_button.connect("clicked", self.on_save)
-        self.apply_monospace_font(self.save_button)
-        self.save_button.get_style_context().add_class("button")
+        self.save_button.get_style_context().add_class("round-button")
         
         # Create the icon
         save_icon = Gtk.Image.new_from_icon_name("document-save", Gtk.IconSize.BUTTON)  # Use a common icon name
@@ -1155,22 +1600,26 @@ class MidiSoundfontTester(Gtk.Window):
         self.path_display_item = Gtk.MenuItem()
         label = Gtk.Label()
         label.set_line_wrap(True)  # Enable word wrapping
-        label.set_max_width_chars(25)  # Limit to 25 characters per line
+        label.set_max_width_chars(20)  # Limit to 25 characters per line
         label.set_ellipsize(Pango.EllipsizeMode.NONE)  # Do not truncate with ellipses
         label.set_name("path_label")  # Add a name for targeted CSS styling
-        
-        # Apply CSS styling to ensure proper coloring
+        label.set_line_wrap(True)  # Enable word wrapping
+        label.set_max_width_chars(25)  # Limit to 25 characters per line
+        label.set_line_wrap(True)  # Enable word wrapping
+        label.set_max_width_chars(25)  # Limit to 25 characters per line
+
+        # Set up CSS styling
         css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(b"""
-            #path_label {
-                color: #5275ba;  /* Inherit text color for dark mode support */
-                padding: 5px;
-                font-size: 12px;
-                background-color: transparent;  /* Ensure no background conflicts */
-            }
-        """)
-        style_context = label.get_style_context()
-        style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        css_provider.load_from_data("""
+        #path_label {
+            color: #6885b4;
+        }
+        """.encode('utf-8'))
+        
+        # Apply the CSS to the current screen
+        screen = Gdk.Screen.get_default()
+        style_context = Gtk.StyleContext()
+        style_context.add_provider_for_screen(screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         
         self.path_display_item.add(label)
         self.path_display_item.set_sensitive(False)  # Make it non-interactive
@@ -2717,7 +3166,6 @@ class MidiSoundfontTester(Gtk.Window):
 
         # Add button box to the dialog content area
         dialog.get_content_area().pack_start(button_box, False, False, 10)
-        self.apply_monospace_font(dialog)
 
         # Show everything and run the dialog
         dialog.show_all()
